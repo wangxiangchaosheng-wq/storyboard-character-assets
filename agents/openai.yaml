@@ -1,0 +1,4 @@
+interface:
+  display_name: "故事板人物资产"
+  short_description: "输入事件，只返回5张有史据道具的免抠半身人物 PNG"
+  default_prompt: "Use $storyboard-character-assets to turn this event theme into exactly five separate, causally indispensable, waist-up half-body character PNGs, each containing exactly one character, one primary action, and one historically supported role-signature prop documented internally by a Prop Card; crop the lower robe straight at the bottom canvas edge, verify real Alpha transparency, and forbid missing or extra props, rounded lower silhouettes, invented hybrid artifacts, full-body poses, collages, scenes, text, or supporting figures. In the final response, display only the five finished transparent PNGs and no manifest, explanation, paths, sources, QA previews, or ZIP unless explicitly requested."
