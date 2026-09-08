@@ -1,0 +1,21 @@
+{
+  "name": "zhihu-hackathon-ai-sim",
+  "private": true,
+  "version": "0.1.0",
+  "description": "知乎黑客松·赛道三：AI 历史模拟引擎（从问题到世界）—— monorepo，见 docs/00",
+  "type": "module",
+  "engines": { "node": ">=22.6.0" },
+  "scripts": {
+    "check": "pnpm -r run check",
+    "test": "pnpm -r run test",
+    "review": "node scripts/review.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "demo": "pnpm --filter @sim/engine-core demo",
+    "serve": "pnpm --filter @sim/serve dev",
+    "web": "pnpm --filter @sim/web dev",
+    "assets:check": "pnpm --filter @sim/web assets:check",
+    "topic": "node --experimental-strip-types packages/topic-pipeline/scripts/demo-topic.mts",
+    "topic:url": "node --experimental-strip-types packages/topic-pipeline/scripts/demo-topic.mts --url"
+  },
+  "packageManager": "pnpm@11.5.2"
+}
