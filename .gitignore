@@ -1,24 +1,28 @@
-# macOS
-.DS_Store
-._*
-.AppleDouble
-.LSOverride
-
-# Secrets
-.env
-.env.*
-*.key
-*.pem
-
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-
-# Node
+# 依赖
 node_modules/
+.pnpm-store/
+
+# 产物
+dist/
+build/
+out/
+coverage/
+*.tsbuildinfo
+
+# 环境与密钥（严禁提交，见 docs/11）
+.env
+.env.local
+.env.*.local
+
+# 素材产物（占位图等运行时生成）
+apps/web/assets/.gen/
+
+# 日志与临时
+*.log
+.tmp/
+.DS_Store
 
 # IDE
-.vscode/
 .idea/
+.vscode/*
+!.vscode/extensions.json### Add .data/
