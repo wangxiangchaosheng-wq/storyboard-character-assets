@@ -1,0 +1,24 @@
+{
+  "name": "@sim/topic-pipeline",
+  "version": "0.1.0",
+  "description": "话题管线：URL/文本 → 抓取 → 事实 → 生成 spec → 对齐校验（docs/01）",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@sim/contracts": "workspace:*",
+    "@sim/engine-core": "workspace:*",
+    "@sim/llm": "workspace:*"
+  },
+  "devDependencies": {
+    "@sim/facts": "workspace:*",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  }
+}
