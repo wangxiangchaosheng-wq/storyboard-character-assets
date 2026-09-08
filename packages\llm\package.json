@@ -1,0 +1,19 @@
+{
+  "name": "@sim/llm",
+  "version": "0.1.0",
+  "description": "LLM 网关与多模态：safeFetch 出站安全、provider 抽象、流式与降级（docs/06）",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@sim/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  }
+}
