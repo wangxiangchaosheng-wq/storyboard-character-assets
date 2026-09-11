@@ -1,0 +1,146 @@
+{
+  "desk": {
+    "x": 0,
+    "y": 0,
+    "width": 1672,
+    "height": 941
+  },
+  "scroll": {
+    "x": 128,
+    "y": 24,
+    "width": 1416,
+    "height": 893
+  },
+  "card-idle": {
+    "x": 258,
+    "y": 131,
+    "width": 218,
+    "height": 139
+  },
+  "card-active": {
+    "x": 258,
+    "y": 270,
+    "width": 227,
+    "height": 141
+  },
+  "dialogue-frame": {
+    "x": 485,
+    "y": 243,
+    "width": 491,
+    "height": 571
+  },
+  "composer-frame": {
+    "x": 485,
+    "y": 807,
+    "width": 491,
+    "height": 67
+  },
+  "zhuge-card": {
+    "x": 274,
+    "y": 140,
+    "width": 124,
+    "height": 124
+  },
+  "zhuge-avatar": {
+    "x": 525,
+    "y": 265,
+    "width": 60,
+    "height": 73
+  },
+  "weiyan-card": {
+    "x": 267,
+    "y": 281,
+    "width": 122,
+    "height": 124
+  },
+  "weiyan-avatar": {
+    "x": 525,
+    "y": 360,
+    "width": 60,
+    "height": 79
+  },
+  "weiyan-hero": {
+    "x": 491,
+    "y": 47,
+    "width": 290,
+    "height": 202
+  },
+  "yangyi-card": {
+    "x": 274,
+    "y": 427,
+    "width": 124,
+    "height": 124
+  },
+  "yangyi-avatar": {
+    "x": 525,
+    "y": 487,
+    "width": 60,
+    "height": 75
+  },
+  "jiangwei-card": {
+    "x": 274,
+    "y": 563,
+    "width": 124,
+    "height": 124
+  },
+  "jiangwei-avatar": {
+    "x": 525,
+    "y": 597,
+    "width": 60,
+    "height": 74
+  },
+  "feiyi-card": {
+    "x": 278.5,
+    "y": 708,
+    "width": 115,
+    "height": 115
+  },
+  "feiyi-avatar": {
+    "x": 525,
+    "y": 691,
+    "width": 60,
+    "height": 74
+  },
+  "microphone": {
+    "x": 782,
+    "y": 823,
+    "width": 35,
+    "height": 35
+  },
+  "suggestion": {
+    "x": 828,
+    "y": 823,
+    "width": 35,
+    "height": 35
+  },
+  "send": {
+    "x": 869,
+    "y": 822,
+    "width": 97,
+    "height": 38
+  },
+  "characters-plaque": {
+    "x": 274,
+    "y": 70,
+    "width": 196,
+    "height": 41
+  },
+  "role-plaque": {
+    "x": 792,
+    "y": 163,
+    "width": 164,
+    "height": 31
+  },
+  "ornament": {
+    "x": 282,
+    "y": 778,
+    "width": 148,
+    "height": 148
+  },
+  "speech-bubble": {
+    "x": 586,
+    "y": 289,
+    "width": 355,
+    "height": 70
+  }
+}
