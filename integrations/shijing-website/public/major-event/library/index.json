@@ -1,0 +1,1176 @@
+[
+  {
+    "id": "major-01-219",
+    "title": "刘备夺取汉中",
+    "year": 219,
+    "endYear": 219,
+    "order": 1,
+    "time": "公元219年",
+    "places": [
+      "汉中"
+    ],
+    "aliases": [
+      "夺取汉中",
+      "战事告捷",
+      "稳固益州",
+      "北伐有基",
+      "公元二一九年"
+    ],
+    "image": "/major-event/library/219-264/event-01.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "7580dfdbb3618394b1a6a20cf7db34904165bb9b2b52dcddf3240e64b5d6d830",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-02-219",
+    "title": "荆州失守与关羽败亡",
+    "year": 219,
+    "endYear": 219,
+    "order": 2,
+    "time": "公元219年",
+    "places": [
+      "荆州",
+      "襄樊"
+    ],
+    "aliases": [
+      "襄樊鏖兵",
+      "荆州失守",
+      "关羽败亡",
+      "两路成空",
+      "公元二一九年"
+    ],
+    "image": "/major-event/library/219-264/event-02.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "09ebd5401bf623340b0cd5ea72bc8157287b0c92577c0fa7734047b8a234c782",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-03-221",
+    "title": "刘备称帝，建立蜀汉",
+    "year": 221,
+    "endYear": 221,
+    "order": 3,
+    "time": "公元221年",
+    "places": [],
+    "aliases": [
+      "刘备称帝",
+      "蜀汉肇建",
+      "汉统再续",
+      "国祚新开",
+      "公元二二一年"
+    ],
+    "image": "/major-event/library/219-264/event-03.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "bc94f863f6cde30f56e1a45f0fdffb21f77c52aa96c9e7b9f515400c1db27f27",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-04-221",
+    "title": "夷陵之战惨败",
+    "year": 221,
+    "endYear": 222,
+    "order": 4,
+    "time": "公元221—222年",
+    "places": [
+      "夷陵"
+    ],
+    "aliases": [
+      "夷陵兵败",
+      "蜀军重创",
+      "东征受挫",
+      "国力大损",
+      "公元二二一至二二二年"
+    ],
+    "image": "/major-event/library/219-264/event-04.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "ade4a685bc813a20a563eb57f5ef4764c666ab184aa89c87aa6c4315fa1fe090",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-05-223",
+    "title": "白帝城托孤",
+    "year": 223,
+    "endYear": 223,
+    "order": 5,
+    "time": "公元223年",
+    "places": [
+      "白帝城"
+    ],
+    "aliases": [
+      "白帝托孤",
+      "先主辞世",
+      "丞相辅政",
+      "重任在肩",
+      "公元二二三年"
+    ],
+    "image": "/major-event/library/219-264/event-05.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "b6e4663d1ec036a17c3c43e03984083cdb77d4befe7bcd5b99733516f889ec7f",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-06-223",
+    "title": "蜀吴重新结盟",
+    "year": 223,
+    "endYear": 225,
+    "order": 6,
+    "time": "公元223—225年",
+    "places": [],
+    "aliases": [
+      "蜀吴复盟",
+      "东线重安",
+      "两国通好",
+      "共御曹魏",
+      "公元二二三至二二五年"
+    ],
+    "image": "/major-event/library/219-264/event-06.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "6587d438962e661f5580066daa811c15868afd3c1e7754a3ce3b12d1e812f220",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-07-225",
+    "title": "诸葛亮南征，平定南中",
+    "year": 225,
+    "endYear": 225,
+    "order": 7,
+    "time": "公元225年",
+    "places": [
+      "南中"
+    ],
+    "aliases": [
+      "南征告捷",
+      "南中既定",
+      "后方渐稳",
+      "北伐有资",
+      "公元二二五年"
+    ],
+    "image": "/major-event/library/219-264/event-07.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "bddabfcf66a69eca29709732a845c2bfe1fde5995379eee79301aa4a3be6c508",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-08-227",
+    "title": "诸葛亮进驻汉中",
+    "year": 227,
+    "endYear": 227,
+    "order": 8,
+    "time": "公元227年",
+    "places": [
+      "汉中"
+    ],
+    "aliases": [
+      "进驻汉中",
+      "整军筹粮",
+      "北向临敌",
+      "待时出师",
+      "公元二二七年"
+    ],
+    "image": "/major-event/library/219-264/event-08.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "0e51d6cb55c927d0793ca861b5260bec47943fdcf0b863d45f78e08e5a97dc50",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-09-227",
+    "title": "《前出师表》",
+    "year": 227,
+    "endYear": 227,
+    "order": 9,
+    "time": "公元227年",
+    "places": [],
+    "aliases": [
+      "表陈北伐",
+      "追述先志",
+      "劝修内政",
+      "临行寄望",
+      "公元二二七年"
+    ],
+    "image": "/major-event/library/219-264/event-09.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "d339f8205781f9512621688b8f6e56b1390468a20177770f00958ee7a83b9e95",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-10-227",
+    "title": "孟达新城之乱被击破",
+    "year": 227,
+    "endYear": 228,
+    "order": 10,
+    "time": "公元227—228年",
+    "places": [
+      "新城"
+    ],
+    "aliases": [
+      "孟达举事",
+      "司马疾进",
+      "新城失守",
+      "外援成空",
+      "公元二二七至二二八年"
+    ],
+    "image": "/major-event/library/219-264/event-10.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "fe8c4b5f3edb100fb652adb6f55fe748bebc27477bcc71f6ef6757547c034181",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-11-228",
+    "title": "诸葛亮第一次北伐，兵出祁山",
+    "year": 228,
+    "endYear": 228,
+    "order": 11,
+    "time": "公元228年",
+    "places": [
+      "祁山"
+    ],
+    "aliases": [
+      "首出祁山",
+      "北伐启幕",
+      "蜀军越岭",
+      "剑指陇右",
+      "公元二二八年"
+    ],
+    "image": "/major-event/library/219-264/event-11.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "a90f9563e76b8830c3ad96bfa617e7160af99dc75ed3bcf995c67bc347f070e3",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-12-228",
+    "title": "魏延提出子午谷奇谋，诸葛亮未采纳",
+    "year": 228,
+    "endYear": 228,
+    "order": 12,
+    "time": "公元228年",
+    "places": [
+      "祁山",
+      "子午谷"
+    ],
+    "aliases": [
+      "子午献策",
+      "分兵求进",
+      "丞相未纳",
+      "仍循祁山",
+      "公元二二八年"
+    ],
+    "image": "/major-event/library/219-264/event-12.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "6e9739d593769933957ed4f5f0c17e2e267543b7e5daf198b76ef469d924aec9",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-13-228",
+    "title": "赵云、邓芝出箕谷佯攻",
+    "year": 228,
+    "endYear": 228,
+    "order": 13,
+    "time": "公元228年",
+    "places": [
+      "祁山",
+      "箕谷"
+    ],
+    "aliases": [
+      "箕谷佯攻",
+      "赵邓分兵",
+      "牵制曹真",
+      "策应祁山",
+      "公元二二八年"
+    ],
+    "image": "/major-event/library/219-264/event-13.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "88440cad401afc73d96bef070310465eef387c7110da28c1d7ec7e2fc0b6feec",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-14-228",
+    "title": "南安、天水、安定三郡响应蜀汉",
+    "year": 228,
+    "endYear": 228,
+    "order": 14,
+    "time": "公元228年",
+    "places": [
+      "南安",
+      "天水",
+      "安定"
+    ],
+    "aliases": [
+      "陇右震动",
+      "三郡响应",
+      "人心归附",
+      "魏防动摇",
+      "公元二二八年"
+    ],
+    "image": "/major-event/library/219-264/event-14.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "fddd1e25d3bde78e8eb035a3156a0f959cff453c6409abd30fb1f93bdc3ba616",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-15-228",
+    "title": "姜维归蜀",
+    "year": 228,
+    "endYear": 228,
+    "order": 15,
+    "time": "公元228年",
+    "places": [],
+    "aliases": [
+      "姜维归蜀",
+      "弃魏从汉",
+      "才识获重",
+      "北伐添将",
+      "公元二二八年"
+    ],
+    "image": "/major-event/library/219-264/event-15.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "da6f1db0e01da6723e4f155db678f635aaf51b67edd03bc4120e29fdc8bd47af",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-16-228",
+    "title": "街亭之战，马谡败于张郃",
+    "year": 228,
+    "endYear": 228,
+    "order": 16,
+    "time": "公元228年",
+    "places": [
+      "街亭"
+    ],
+    "aliases": [
+      "街亭失守",
+      "马谡兵败",
+      "张郃断水",
+      "蜀势急转",
+      "公元二二八年"
+    ],
+    "image": "/major-event/library/219-264/event-16.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "d3c83acf512bcadf4cf741dd4e9babb036bee48e575f83e2aca0b0ad0c349a19",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-17-228",
+    "title": "诸葛亮撤军，马谡获罪，诸葛亮自贬",
+    "year": 228,
+    "endYear": 228,
+    "order": 17,
+    "time": "公元228年",
+    "places": [],
+    "aliases": [
+      "北伐受挫",
+      "退军问责",
+      "马谡获罪",
+      "丞相自贬",
+      "公元二二八年"
+    ],
+    "image": "/major-event/library/219-264/event-17.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "1a6f304955fe0013b1ad28927a9687bcd29d937f6f03db6ee40bf09b4c6e1837",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-18-228",
+    "title": "诸葛亮发动第二次北伐",
+    "year": 228,
+    "endYear": 228,
+    "order": 18,
+    "time": "公元228年冬",
+    "places": [],
+    "aliases": [
+      "冬师再举",
+      "二伐曹魏",
+      "乘隙进兵",
+      "再谋关中",
+      "公元二二八年冬"
+    ],
+    "image": "/major-event/library/219-264/event-18.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "7601d9ee1a368e7dcad6cd23451275fe1db5e987cc0d5e185feba3ae7aacaa92",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-19-228",
+    "title": "陈仓之战，郝昭守城",
+    "year": 228,
+    "endYear": 229,
+    "order": 19,
+    "time": "公元228—229年",
+    "places": [
+      "陈仓"
+    ],
+    "aliases": [
+      "陈仓攻阻",
+      "郝昭固守",
+      "蜀军难进",
+      "粮尽撤围",
+      "公元二二八至二二九年"
+    ],
+    "image": "/major-event/library/219-264/event-19.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "cc1fba0764e7c6105342599fcc92be9a9c85684de4e74c6fd0ab6f745c4d2624",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-20-229",
+    "title": "诸葛亮发动第三次北伐",
+    "year": 229,
+    "endYear": 229,
+    "order": 20,
+    "time": "公元229年",
+    "places": [],
+    "aliases": [
+      "三伐启行",
+      "转向陇南",
+      "分兵出击",
+      "谋取二郡",
+      "公元二二九年"
+    ],
+    "image": "/major-event/library/219-264/event-20.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "1303d4b41cea7b96124af2e86217256841ba01fe2e17b4597783310faf3ba898",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-21-229",
+    "title": "蜀汉夺取武都、阴平二郡",
+    "year": 229,
+    "endYear": 229,
+    "order": 21,
+    "time": "公元229年",
+    "places": [
+      "武都",
+      "阴平"
+    ],
+    "aliases": [
+      "武都归蜀",
+      "阴平入版",
+      "陇南拓土",
+      "北伐获地",
+      "公元二二九年"
+    ],
+    "image": "/major-event/library/219-264/event-21.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "09edb2cc6ae85de2c5fc385c8f7a9b5f7051a1dd8022af84bd03db90127648fc",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-22-230",
+    "title": "曹魏大举伐蜀，因暴雨、栈道和补给问题撤军",
+    "year": 230,
+    "endYear": 230,
+    "order": 22,
+    "time": "公元230年",
+    "places": [],
+    "aliases": [
+      "魏军伐蜀",
+      "暴雨断道",
+      "粮运难继",
+      "无功而还",
+      "公元二三〇年"
+    ],
+    "image": "/major-event/library/219-264/event-22.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "71ba782128a9da9d120fe68418a104544792e756f597ca2db0b84d6dc186a6e6",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-23-230",
+    "title": "阳溪之战，魏延、吴懿击败郭淮等魏军",
+    "year": 230,
+    "endYear": 230,
+    "order": 23,
+    "time": "公元230年",
+    "places": [
+      "阳溪"
+    ],
+    "aliases": [
+      "阳溪鏖战",
+      "魏吴合击",
+      "郭淮败退",
+      "蜀军得胜",
+      "公元二三〇年"
+    ],
+    "image": "/major-event/library/219-264/event-23.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "2286ac2bb53c04f995ba9faa242e2a31fd02537f0cdc8bf72e965997efd6b39a",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-24-231",
+    "title": "诸葛亮第四次北伐，再出祁山",
+    "year": 231,
+    "endYear": 231,
+    "order": 24,
+    "time": "公元231年",
+    "places": [
+      "祁山"
+    ],
+    "aliases": [
+      "四伐再举",
+      "兵向祁山",
+      "蜀魏争衡",
+      "陇右再战",
+      "公元二三一年"
+    ],
+    "image": "/major-event/library/219-264/event-24.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "7fcd8a07f68b75e71043e70112422561c45f07ea792193869d59d76e92edfbfd",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-25-231",
+    "title": "司马懿成为曹魏西线核心统帅",
+    "year": 231,
+    "endYear": 231,
+    "order": 25,
+    "time": "公元231年",
+    "places": [],
+    "aliases": [
+      "司马掌军",
+      "总督西线",
+      "对阵诸葛",
+      "持重谋守",
+      "公元二三一年"
+    ],
+    "image": "/major-event/library/219-264/event-25.png",
+    "width": 1950,
+    "height": 807,
+    "sha256": "7c67e2ee0865e1555d6b51be06df83b3ca31fbadc512d5cde3e13bee9fcccd66",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-26-231",
+    "title": "上邽—卤城一带激战",
+    "year": 231,
+    "endYear": 231,
+    "order": 26,
+    "time": "公元231年",
+    "places": [
+      "上邽",
+      "卤城"
+    ],
+    "aliases": [
+      "上邽交锋",
+      "卤城激战",
+      "蜀军得势",
+      "魏军固守",
+      "公元二三一年"
+    ],
+    "image": "/major-event/library/219-264/event-26.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "adcc97523c550e2cc2988f1d83d57d4b1bf7a70324758776a27a37f3cf9fe0ff",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-27-231",
+    "title": "李严粮运失败，诸葛亮被迫撤军",
+    "year": 231,
+    "endYear": 231,
+    "order": 27,
+    "time": "公元231年",
+    "places": [],
+    "aliases": [
+      "粮运失期",
+      "军资告匮",
+      "诸葛退兵",
+      "攻势中止",
+      "公元二三一年"
+    ],
+    "image": "/major-event/library/219-264/event-27.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "542dfc587978868e61081ca1f894621987163836a7fef62a491606493e325a5d",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-28-231",
+    "title": "木门道伏击，张郃战死",
+    "year": 231,
+    "endYear": 231,
+    "order": 28,
+    "time": "公元231年",
+    "places": [
+      "木门道"
+    ],
+    "aliases": [
+      "木门设伏",
+      "追军中箭",
+      "张郃战死",
+      "魏失名将",
+      "公元二三一年"
+    ],
+    "image": "/major-event/library/219-264/event-28.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "a6670d7afded116bb90e02a9daadf679be38398deaaf8de81432854ec06593d7",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-29-234",
+    "title": "诸葛亮第五次北伐，进驻五丈原",
+    "year": 234,
+    "endYear": 234,
+    "order": 29,
+    "time": "公元234年",
+    "places": [
+      "五丈原"
+    ],
+    "aliases": [
+      "五伐出师",
+      "进驻五丈",
+      "临渭列营",
+      "决意久持",
+      "公元二三四年"
+    ],
+    "image": "/major-event/library/219-264/event-29.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "6c8af931f98b7137137dce27deeaaa355d792d2489f5fb66a6bff619a8d02a2d",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-30-234",
+    "title": "司马懿坚守不战",
+    "year": 234,
+    "endYear": 234,
+    "order": 30,
+    "time": "公元234年",
+    "places": [],
+    "aliases": [
+      "司马坚守",
+      "闭营不战",
+      "以时耗敌",
+      "蜀军难进",
+      "公元二三四年"
+    ],
+    "image": "/major-event/library/219-264/event-30.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "ba3d1d1aecab687b73cf8307123a12770e799c7eb846c66e5822a0fc8e2f5200",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-31-234",
+    "title": "诸葛亮在五丈原屯田",
+    "year": 234,
+    "endYear": 234,
+    "order": 31,
+    "time": "公元234年",
+    "places": [
+      "五丈原"
+    ],
+    "aliases": [
+      "五丈屯田",
+      "军民耕作",
+      "就地筹粮",
+      "以图久驻",
+      "公元二三四年"
+    ],
+    "image": "/major-event/library/219-264/event-31.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "b7a238c2e1ac5a8406c80d64fc0d52aaa6a78267fceff91a8047122ab9510765",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-32-234",
+    "title": "诸葛亮病逝五丈原",
+    "year": 234,
+    "endYear": 234,
+    "order": 32,
+    "time": "公元234年",
+    "places": [
+      "五丈原"
+    ],
+    "aliases": [
+      "五丈星沉",
+      "武侯病逝",
+      "北伐未竟",
+      "三军含悲",
+      "公元二三四年"
+    ],
+    "image": "/major-event/library/219-264/event-32.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "03cdfc8ef579fd0052923d79171427c9810768dbd7d79b8feadca861d0252c21",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-33-234",
+    "title": "蜀军秘密撤退，死诸葛走生仲达",
+    "year": 234,
+    "endYear": 234,
+    "order": 33,
+    "time": "公元234年",
+    "places": [],
+    "aliases": [
+      "秘不发丧",
+      "蜀军整退",
+      "魏追旋止",
+      "军阵犹全",
+      "公元二三四年"
+    ],
+    "image": "/major-event/library/219-264/event-33.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "8f94a379c19cacaa626d8946262fe66f0cf1d056cb50f5de62c6465f75d277d5",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-34-234",
+    "title": "魏延、杨仪冲突，马岱斩魏延",
+    "year": 234,
+    "endYear": 234,
+    "order": 34,
+    "time": "公元234年",
+    "places": [],
+    "aliases": [
+      "魏杨交争",
+      "归路兵乱",
+      "马岱斩延",
+      "蜀军内耗",
+      "公元二三四年"
+    ],
+    "image": "/major-event/library/219-264/event-34.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "47c08df9de03365604705494d98b3a40f0482ba93a1daccab8af38c20c57185b",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-35-244",
+    "title": "兴势之战，王平等击退曹爽伐蜀",
+    "year": 244,
+    "endYear": 244,
+    "order": 35,
+    "time": "公元244年",
+    "places": [
+      "汉中",
+      "兴势"
+    ],
+    "aliases": [
+      "兴势据险",
+      "王平拒敌",
+      "魏军退却",
+      "汉中得全",
+      "公元二四四年"
+    ],
+    "image": "/major-event/library/219-264/event-35.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "7cf4817039ff0b8ea6019e7c10e5cab11cf3cf7a815a8ff5b468885d8fbdf8a5",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-36-247",
+    "title": "陇西羌胡反魏，姜维出兵响应",
+    "year": 247,
+    "endYear": 247,
+    "order": 36,
+    "time": "公元247年",
+    "places": [
+      "陇西"
+    ],
+    "aliases": [
+      "陇西起兵",
+      "羌胡反魏",
+      "姜维接应",
+      "联势北进",
+      "公元二四七年"
+    ],
+    "image": "/major-event/library/219-264/event-36.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "0dc1df52702c35a40a35e608eb49230b4101dfb6d3d39d6ee3bd77d615347ee7",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-37-249",
+    "title": "高平陵之变，司马懿控制曹魏政权",
+    "year": 249,
+    "endYear": 249,
+    "order": 37,
+    "time": "公元249年",
+    "places": [
+      "高平陵"
+    ],
+    "aliases": [
+      "高平政变",
+      "司马夺权",
+      "曹爽失势",
+      "魏政易手",
+      "公元二四九年"
+    ],
+    "image": "/major-event/library/219-264/event-37.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "9f177edb7e308358be58cc5e5169e92d53316a82d1492d927c23d11397c620b8",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-38-253",
+    "title": "费祎遇刺身亡",
+    "year": 253,
+    "endYear": 253,
+    "order": 38,
+    "time": "公元253年",
+    "places": [],
+    "aliases": [
+      "费祎遇刺",
+      "蜀失重臣",
+      "朝局生变",
+      "北伐少制",
+      "公元二五三年"
+    ],
+    "image": "/major-event/library/219-264/event-38.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "eaf9ac318ef465e57537952e29555ebe95da2cdd3310499928835be54279af66",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-39-254",
+    "title": "李简降蜀，姜维大举进攻陇西",
+    "year": 254,
+    "endYear": 254,
+    "order": 39,
+    "time": "公元254年",
+    "places": [
+      "陇西",
+      "狄道"
+    ],
+    "aliases": [
+      "李简归蜀",
+      "狄道开门",
+      "姜维进兵",
+      "陇西再争",
+      "公元二五四年"
+    ],
+    "image": "/major-event/library/219-264/event-39.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "d84a74ec3f59a0f5a9c32f859f49d543a9b4f2c975d1964b5f32849c6a2c4508",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-40-255",
+    "title": "洮西之战，姜维大败王经",
+    "year": 255,
+    "endYear": 255,
+    "order": 40,
+    "time": "公元255年",
+    "places": [
+      "洮西"
+    ],
+    "aliases": [
+      "洮西大捷",
+      "姜维破敌",
+      "王经败走",
+      "蜀军振奋",
+      "公元二五五年"
+    ],
+    "image": "/major-event/library/219-264/event-40.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "da3aa5b83f76218b2972d8c707caa5b5c56e4344231dae438e40e95fe1f5263c",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-41-255",
+    "title": "姜维围攻狄道，陈泰成功解围",
+    "year": 255,
+    "endYear": 255,
+    "order": 41,
+    "time": "公元255年",
+    "places": [
+      "狄道"
+    ],
+    "aliases": [
+      "蜀围狄道",
+      "陈泰驰援",
+      "魏军解困",
+      "战果难延",
+      "公元二五五年"
+    ],
+    "image": "/major-event/library/219-264/event-41.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "45444888be56682e1a2fd1b79e6fac3d91c35add5c1e905ea04bf52acef7f546",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-42-256",
+    "title": "段谷之战，姜维败于邓艾",
+    "year": 256,
+    "endYear": 256,
+    "order": 42,
+    "time": "公元256年",
+    "places": [
+      "段谷"
+    ],
+    "aliases": [
+      "段谷兵败",
+      "姜维受挫",
+      "邓艾制胜",
+      "蜀军重损",
+      "公元二五六年"
+    ],
+    "image": "/major-event/library/219-264/event-42.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "53ffc3d669058862c43233ca2e65eb5ec5365c74960b05e34a5799cf0a8677d4",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-43-257",
+    "title": "姜维趁诸葛诞之乱再次北伐",
+    "year": 257,
+    "endYear": 258,
+    "order": 43,
+    "time": "公元257—258年",
+    "places": [],
+    "aliases": [
+      "魏国内乱",
+      "姜维再出",
+      "乘隙北进",
+      "相持而还",
+      "公元二五七至二五八年"
+    ],
+    "image": "/major-event/library/219-264/event-43.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "f84269156705b9b916fd54ba7f88f59434292106df3f0cd18d5a4846c4123e05",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-44-262",
+    "title": "侯和之战，姜维败于邓艾，退往沓中",
+    "year": 262,
+    "endYear": 262,
+    "order": 44,
+    "time": "公元262年",
+    "places": [
+      "侯和",
+      "沓中"
+    ],
+    "aliases": [
+      "侯和再败",
+      "姜维退守",
+      "远驻沓中",
+      "蜀势渐衰",
+      "公元二六二年"
+    ],
+    "image": "/major-event/library/219-264/event-44.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "c8b8db82485f62c6c1d6013d0a5236cd49326146e586bdee05ec87ca9ad7ea30",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-45-263",
+    "title": "曹魏发动灭蜀战争",
+    "year": 263,
+    "endYear": 263,
+    "order": 45,
+    "time": "公元263年",
+    "places": [],
+    "aliases": [
+      "魏师大举",
+      "分道伐蜀",
+      "战局逆转",
+      "蜀境告急",
+      "公元二六三年"
+    ],
+    "image": "/major-event/library/219-264/event-45.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "f834d584e7ef9752618231f8b4f4e1bc8114ea18a5fc7cbfbd36bfbfa77ade04",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-46-263",
+    "title": "姜维退守剑阁，阻挡钟会主力",
+    "year": 263,
+    "endYear": 263,
+    "order": 46,
+    "time": "公元263年",
+    "places": [
+      "剑阁"
+    ],
+    "aliases": [
+      "姜维守阁",
+      "凭险拒魏",
+      "钟会受阻",
+      "正面犹坚",
+      "公元二六三年"
+    ],
+    "image": "/major-event/library/219-264/event-46.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "99b16eaa8f44e34ca0570f45faa8c75360ad21be89e09b65af0e3e6c1d9b9ff0",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-47-263",
+    "title": "邓艾偷渡阴平",
+    "year": 263,
+    "endYear": 263,
+    "order": 47,
+    "time": "公元263年",
+    "places": [
+      "阴平"
+    ],
+    "aliases": [
+      "邓艾间道",
+      "偷渡阴平",
+      "越险深入",
+      "直趋蜀腹",
+      "公元二六三年"
+    ],
+    "image": "/major-event/library/219-264/event-47.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "b3afaf8ae52568e2acf36d82e86b9ee5bfa2599cff087a96b73a79a64fc8669d",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-48-263",
+    "title": "绵竹之战，诸葛瞻、诸葛尚战死",
+    "year": 263,
+    "endYear": 263,
+    "order": 48,
+    "time": "公元263年",
+    "places": [
+      "绵竹"
+    ],
+    "aliases": [
+      "绵竹失守",
+      "瞻尚战死",
+      "屏障已破",
+      "成都危急",
+      "公元二六三年"
+    ],
+    "image": "/major-event/library/219-264/event-48.png",
+    "width": 1949,
+    "height": 807,
+    "sha256": "453d1a559d1471eede1830791c946383c2aab075034acf55fe6da33d4a51bbfb",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-49-263",
+    "title": "刘禅向邓艾投降，蜀汉灭亡",
+    "year": 263,
+    "endYear": 263,
+    "order": 49,
+    "time": "公元263年",
+    "places": [],
+    "aliases": [
+      "后主出降",
+      "邓艾受印",
+      "蜀汉终灭",
+      "蜀魏战终",
+      "公元二六三年"
+    ],
+    "image": "/major-event/library/219-264/event-49.png",
+    "width": 1950,
+    "height": 807,
+    "sha256": "a99b9b85684e730475e215ce8a23c7b45dad3ca5ab490413badd94d73283b133",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  },
+  {
+    "id": "major-50-264",
+    "title": "钟会之乱，姜维谋求复蜀失败并战死",
+    "year": 264,
+    "endYear": 264,
+    "order": 50,
+    "time": "公元264年",
+    "places": [],
+    "aliases": [
+      "钟会兵变",
+      "姜维图复",
+      "事败身死",
+      "复蜀成空",
+      "公元二六四年"
+    ],
+    "image": "/major-event/library/219-264/event-50.png",
+    "width": 1950,
+    "height": 807,
+    "sha256": "063f3642b5256ebb4c91dd91a49d3a5abda0f33ffdddbafb8cb3adeb1a6f0a6a",
+    "source": "用户提供的219—264年50张重大事件资产",
+    "validation": "partial"
+  }
+]
