@@ -1,0 +1,1 @@
+{"id":"example-march-001","expectedVersion":0,"confirmed":true,"summary":"【接口测试事件，非历史事实】先遣队沿谷道行军两日，消耗粮草六百份，未发生交战或城市易主。","deltas":[{"metric":"grain","by":-600}],"elapsedDays":2,"cityChanges":[],"significant":true}

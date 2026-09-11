@@ -1,0 +1,13 @@
+import {StoryLibrary} from './story-library.js';
+import {AssetLibrary} from './asset-library.js';
+import {configureNetwork} from './network.js';
+import {resolve} from 'node:path';
+import {Store} from './store.js';import {Worker} from './worker.js';import {OpenAIArt} from './provider.js';import {makeServer} from './server.js';
+const network=configureNetwork();
+console.log(`生成服务网络：${network}`);
+const store=new Store(resolve(process.env.AGENT_DATA_DIR||'.agent-data'));store.recover();
+const worker=new Worker(store,new OpenAIArt(),new AssetLibrary(resolve(process.env.CHARACTER_LIBRARY_DIR||'人物素材库')),new StoryLibrary(resolve('故事板素材库'),resolve(process.env.AGENT_DATA_DIR||'.agent-data','story-cache')));const server=makeServer(store,worker);
+const port=Number(process.env.AGENT_PORT||4318);
+server.listen(port,'127.0.0.1',()=>{console.log(`史境 Agent 服务：http://127.0.0.1:${port}；OpenAI ${process.env.OPENAI_API_KEY?'已配置':'待配置'}`);});
+process.on('SIGTERM',()=>{worker.stopping=true;server.close();});
+process.on('SIGINT',()=>{worker.stopping=true;server.close();});

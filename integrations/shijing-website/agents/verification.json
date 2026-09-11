@@ -1,0 +1,18 @@
+{
+  "date": "2026-09-09",
+  "agentTests": {
+    "passed": 13,
+    "mode": "mock/offline"
+  },
+  "legacyWorkflowChecks": {
+    "passed": 12,
+    "mode": "mock/offline"
+  },
+  "typecheck": "passed",
+  "webBuild": "passed",
+  "localDiscussionHTTP": 200,
+  "localAgentProxy": "passed",
+  "realOpenAIImageGeneration": "not run: API key not configured",
+  "teamLiveEngine": "not run: SIM_ENGINE_URL not configured",
+  "deployment": "not deployed"
+}

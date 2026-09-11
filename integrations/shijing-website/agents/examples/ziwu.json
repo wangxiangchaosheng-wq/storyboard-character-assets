@@ -1,0 +1,19 @@
+{
+  "spec": {
+    "id": "ziwu-228-example",
+    "title": "是否采纳魏延子午谷方案？",
+    "scenario": {"background": "公元228年，蜀汉讨论北伐路线。魏延提出子午谷方案，诸葛亮与群臣权衡奇袭、接应与粮运。这是方案讨论，没有发生攻克长安的事实。此文件用于接口演示，数值为测试设定。"},
+    "cast": [
+      {"id":"zhuge-liang","name":"诸葛亮","role":"蜀汉丞相","description":"主持北伐，审慎权衡后勤与全军协同。","stance":"重视全局"},
+      {"id":"wei-yan","name":"魏延","role":"蜀汉将领","description":"提出奇袭方案，主张争取战机。","stance":"主动进取"},
+      {"id":"yang-yi","name":"杨仪","role":"军务官员","description":"关注军务组织和粮运协调。","stance":"保障后勤"},
+      {"id":"jiang-wei","name":"姜维","role":"蜀汉将领","description":"参与路线与接应条件的推演。","stance":"审视战机"},
+      {"id":"fei-yi","name":"费祎","role":"蜀汉官员","description":"协调意见，关注合作与行动条件。","stance":"协调众议"}
+    ],
+    "metrics": [
+      {"key":"troops","label":"兵力","start":10000,"min":0,"max":100000,"unit":"人"},
+      {"key":"grain","label":"粮草","start":30000,"min":0,"max":1000000,"unit":"份"}
+    ]
+  },
+  "cities": {"汉中":"蜀","长安":"魏"}
+}
