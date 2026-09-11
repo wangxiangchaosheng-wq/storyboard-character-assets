@@ -1,0 +1,16 @@
+<ns0:svg xmlns:ns0="http://www.w3.org/2000/svg" xmlns:ns1="http://www.w3.org/1999/xlink" width="1672" height="941" viewBox="0 0 1672 941" fill="none"><ns0:rect y="122" width="1672" height="697" fill="url(#pattern1_245_421)" />
+<ns0:defs>
+<ns0:pattern id="pattern0_245_421" patternContentUnits="objectBoundingBox" width="1" height="1">
+<ns0:use ns1:href="#image0_245_421" transform="scale(0.000299043 0.00053135)" />
+</ns0:pattern>
+<ns0:pattern id="pattern1_245_421" patternContentUnits="objectBoundingBox" width="1" height="1">
+<ns0:use ns1:href="#image1_245_421" transform="matrix(0.000514933 0 0 0.00123525 0 -0.000275567)" />
+</ns0:pattern>
+<ns0:pattern id="pattern2_245_421" patternContentUnits="objectBoundingBox" width="1" height="1">
+<ns0:use ns1:href="#image2_245_421" transform="matrix(0.000513084 0 0 0.00123995 0 -0.000320677)" />
+</ns0:pattern>
+<ns0:image id="image0_245_421" width="3344" height="1882" preserveAspectRatio="none" ns1:href="/major-event/layer-11.png" />
+<ns0:image id="image1_245_421" width="1942" height="810" preserveAspectRatio="none" ns1:href="/major-event/layer-12.png" />
+<ns0:image id="image2_245_421" width="1949" height="807" preserveAspectRatio="none" ns1:href="/major-event/layer-13.png" />
+</ns0:defs>
+</ns0:svg>
