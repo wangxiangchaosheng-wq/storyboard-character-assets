@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "note": "示例清单 —— 参照参考图(廷议界面 1672x941) 推导。美术同学复制为 apps/web/assets/manifest.json 后填充 file 字段即可。",
+  "entries": [
+    { "key": "portrait/zhuge-liang", "category": "portrait", "file": "portrait/zhuge-liang.png", "alt": "诸葛亮", "w": 300, "h": 400, "suggest": "左栏第一个角色：蜀汉丞相，羽扇纶巾" },
+    { "key": "portrait/wei-yan",     "category": "portrait", "file": "portrait/wei-yan.png",     "alt": "魏延", "w": 300, "h": 400, "suggest": "蜀汉前军将军，刚猛武将" },
+    { "key": "portrait/yang-yi",     "category": "portrait", "file": "portrait/yang-yi.png",     "alt": "杨仪", "w": 300, "h": 400, "suggest": "蜀汉尚书令，文官" },
+    { "key": "portrait/jiang-wei",   "category": "portrait", "file": "portrait/jiang-wei.png",   "alt": "姜维", "w": 300, "h": 400, "suggest": "蜀汉大将军" },
+    { "key": "portrait/fei-yi",      "category": "portrait", "file": "portrait/fei-yi.png",      "alt": "费祎", "w": 300, "h": 400, "suggest": "蜀汉尚书" },
+    { "key": "portrait/player",      "category": "portrait", "file": "portrait/player.png",      "alt": "玩家角色", "w": 300, "h": 400, "suggest": "通用：按选角生成" },
+
+    { "key": "map/hanzhong",         "category": "map", "file": "map/hanzhong.png",     "alt": "汉中", "w": 120, "h": 90,  "suggest": "地图右上角地点标记：汉中（参考图右上）" },
+    { "key": "map/changan",          "category": "map", "file": "map/changan.png",      "alt": "长安", "w": 120, "h": 90,  "suggest": "目标城：长安" },
+    { "key": "map/tongguan",         "category": "map", "file": "map/tongguan.png",     "alt": "潼关", "w": 120, "h": 90,  "suggest": "关隘：潼关" },
+    { "key": "map/zhengguo",         "category": "map", "file": "map/zhengguo.png",     "alt": "子午谷", "w": 120, "h": 90, "suggest": "奇谋路径标注：子午谷" },
+    { "key": "map/base",             "category": "map", "file": "map/base.png",         "alt": "战略地图底图", "w": 520, "h": 300, "suggest": "右侧地图面板底图（古代中国西北）" },
+
+    { "key": "ui/panel-court",       "category": "ui", "file": "ui/panel-court.png",       "alt": "廷议面板", "w": 520, "h": 300, "suggest": "中间对话流背景（古籍卷轴风）" },
+    { "key": "ui/bubble-npc",        "category": "ui", "file": "ui/bubble-npc.png",        "alt": "NPC 气泡", "w": 330, "h": 110, "suggest": "对话气泡（含名字区，左对齐）" },
+    { "key": "ui/bubble-player",     "category": "ui", "file": "ui/bubble-player.png",     "alt": "玩家气泡", "w": 330, "h": 110, "suggest": "玩家指令气泡（右对齐）" },
+    { "key": "ui/panel-cast",        "category": "ui", "file": "ui/panel-cast.png",        "alt": "角色栏面板", "w": 180, "h": 600, "suggest": "左栏角色列表（5 人卡）" },
+    { "key": "ui/input-req",         "category": "ui", "file": "ui/input-req.png",         "alt": "指令输入框", "w": 460, "h": 60,  "suggest": "底部输入条（参考图底部竖排「魏延，…」指令）" },
+    { "key": "ui/btn-action",        "category": "ui", "file": "ui/btn-action.png",        "alt": "行动按钮", "w": 120, "h": 44,  "suggest": "决策按钮常态" },
+    { "key": "ui/btn-action-hover",  "category": "ui", "file": "ui/btn-action-hover.png",  "alt": "行动按钮悬停", "w": 120, "h": 44,  "variantOf": "ui/btn-action" },
+
+    { "key": "bg/court",             "category": "bg", "file": "bg/court.png", "alt": "廷议场景背景", "w": 780, "h": 440, "suggest": "主界面中央场景背景" },
+    { "key": "bg/march",             "category": "bg", "file": "bg/march.png", "alt": "行军场景背景", "w": 780, "h": 440 },
+    { "key": "bg/caption",           "category": "bg", "file": "bg/caption.png", "alt": "大事记/插画占位背景", "w": 780, "h": 440 },
+
+    { "key": "event/zhengwu-gu",     "category": "event", "file": "event/zhengwu-gu.png", "alt": "事件插画：子午谷奇谋（草稿审核）", "w": 780, "h": 440, "suggest": "AI 生图模板交给 cpk-agnes(06)" },
+    { "key": "audio/bgm-main",       "category": "audio", "file": "audio/bgm-main.mp3",    "alt": "主音乐（可选）" }
+  ]
+}

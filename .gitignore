@@ -1,0 +1,38 @@
+# 依赖
+node_modules/
+.pnpm-store/
+
+# 产物
+dist/
+build/
+out/
+coverage/
+*.tsbuildinfo
+
+# 环境与密钥（严禁提交，见 docs/11）
+.env
+.env.local
+.env.*.local
+
+# 素材产物（占位图等运行时生成）
+apps/web/assets/.gen/
+
+# 日志与临时
+*.log
+.tmp/
+.DS_Store
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# 运行时产物
+_refs/
+.data/
+.v2c/
+.video_agent/
+
+# Mimosa 扫描状态（ZCode hook 内部状态，不入库）
+.mimosa/
+

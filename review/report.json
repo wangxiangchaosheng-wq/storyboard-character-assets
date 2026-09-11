@@ -1,0 +1,66 @@
+{
+  "conclusion": "pass",
+  "finishedAt": "2026-09-09T14:28:59.782Z",
+  "mode": "full",
+  "steps": [
+    {
+      "id": "types",
+      "name": "类型检查 pnpm -r run check（全仓 tsc）",
+      "ok": true,
+      "skipped": false,
+      "detail": "",
+      "fix": "打开报错包的输出（pnpm --filter <包> check），按 tsc 指出的文件:行修；常见：import 路径、空值判断。"
+    },
+    {
+      "id": "tests",
+      "name": "全量测试 pnpm -r test",
+      "ok": true,
+      "skipped": false,
+      "detail": "",
+      "fix": "跑一遍 n> 于失败包的测试：pnpm --filter <包> test，按 ✖ 断言逐条修该测试或业务代码。"
+    },
+    {
+      "id": "no-gamewords",
+      "name": "静态审计 · 游戏化指标词",
+      "ok": true,
+      "skipped": false,
+      "detail": "",
+      "fix": "把这些词换成史册真实科目/文言表述（如「局面的」→「仓廪」「朝局」），改完重跑。"
+    },
+    {
+      "id": "units_front",
+      "name": "前端指标卡露出真实单位（unit span + CSS）",
+      "ok": true,
+      "skipped": false,
+      "detail": "",
+      "fix": "检查 renderGauge() 中 const unit = (def?.unit) ? span… 与 app.css 的 .g-num .unit。"
+    },
+    {
+      "id": "syntax",
+      "name": "前端脚本语法（node --check app.js）",
+      "ok": true,
+      "skipped": false,
+      "detail": "",
+      "fix": "对照报错行号修复 app.js 括号/引号配对。"
+    },
+    {
+      "id": "secrets",
+      "name": "凭据字面量扫描（只认可能可用的长敏感串）",
+      "ok": true,
+      "skipped": false,
+      "detail": "",
+      "fix": "把上列字面量改成从 process.env/密钥服务读取，删除示例中的真实可排凭据。"
+    },
+    {
+      "id": "smoke",
+      "name": "真实进程冒烟（起服务→建话题→spec 纪律→建局）",
+      "ok": true,
+      "skipped": false,
+      "detail": "",
+      "fix": "按冒烟输出的 ✗ 项修（端口冲突找服务、日志看启动报错），修完重跑 pnpm smoke。"
+    }
+  ],
+  "okCount": 7,
+  "total": 7,
+  "smoke": true
+}
