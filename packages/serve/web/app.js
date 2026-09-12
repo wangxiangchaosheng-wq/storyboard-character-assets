@@ -44,6 +44,15 @@ async function api(sub, opts) {
   return body;
 }
 
+/* POST 查询封装：URL 恒定（不接受任何插值），可变数据一律走请求体。
+   hash 恢复（restoreGame/restoreTopic/loadSpec）场景专用，杜绝把外部输入拼进请求路径。 */
+async function apiPost(path, data) {
+  return api(path, {
+    method: 'POST',
+    body: JSON.stringify(data || {}),
+  });
+}
+
 let toastTimer = 0;
 function toast(msg, isErr) {
   const t = $('toast');
@@ -120,7 +129,7 @@ function bootBadge() {
 /* hash 入参白名单（restoreGame / restoreTopic 入口都会校验）：
    gameId 恒为 g + 8 位 hex；topicId 为 txt: 前缀或 http(s) 链接 */
 const GAME_ID_RE = /^g[0-9a-f]{8}$/;
-const TOPIC_ID_RE = /^(txt:|https?:\/\/)/;
+const TOPIC_ID_RE = /^txt:/;
 
 function boot() {
   bootBadge();
@@ -294,14 +303,15 @@ async function loadSpec() {
 }
 
 async function restoreTopic(topicId) {
-  // hash 来源的 topicId 未经可信：仅放行 txt: 前缀或 http(s) 链接
+  // hash 来源的 topicId 未经可信：仅放行 txt: 前缀（URL 粘贴走表单提交，不走 hash 恢复）
   if (typeof topicId !== 'string' || !TOPIC_ID_RE.test(topicId)) {
     phase('home');
     return;
   }
   S.topicId = topicId;
   try {
-    const r = await api('/api/topics/' + encodeURIComponent(topicId) + '/spec');
+    // id 走请求体（URL 恒定），不拼进请求路径
+    const r = await apiPost('/api/topics/spec', { id: topicId });
     S.spec = r.spec;
     renderSpec();
   } catch (e) {
@@ -456,14 +466,14 @@ async function restoreGame(gameId) {
     return;
   }
   try {
-    const v = await api('/api/games/' + encodeURIComponent(gameId) + '/state');
+    // id 一律走请求体（URL 恒定）；state 响应已内联 spec，无需二次查询
+    const v = await apiPost('/api/games/state', { id: gameId });
     S.gameId = gameId;
     S.topicId = v.specId;
-    const sr = await api('/api/topics/' + encodeURIComponent(v.specId) + '/spec').catch(function () { return null; });
-    if (sr) S.spec = sr.spec;
+    if (v.spec) S.spec = v.spec;
     renderGame(v);
     if (v.status === 'final') {
-      const e = await api('/api/games/' + encodeURIComponent(gameId) + '/ending');
+      const e = await apiPost('/api/games/ending', { id: gameId });
       renderEnding(e);
     }
   } catch (e) {
