@@ -29,6 +29,8 @@ export interface Persona {
   prompt: string;        // 私有人设 system prompt（核心）
   traits: Traits;
   isPlayerCreated?: boolean;
+  /** 可选角色图片（来自素材库的 avatar path，如 /art/zhuge-avatar.webp） */
+  image?: string;
 }
 
 // 议题 / 案件 / 冲突（对应原版 talk-task）

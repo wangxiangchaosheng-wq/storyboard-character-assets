@@ -727,3 +727,9 @@ footer {
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: rgba(90, 70, 40, 0.3); border-radius: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* 角色素材图：圆角裁切，保持宽高比 */
+.char-img { width: 48px; height: 48px; border-radius: 50
+/* 角色素材图：圆角裁切，保持宽高比 */
+.char-img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; display: block; border: 2px solid rgba(166,61,47,0.35); }
+.roster-item .char-img { width: 36px; height: 36px; }

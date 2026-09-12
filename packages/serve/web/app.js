@@ -415,6 +415,16 @@ function stanceColor(stance) {
   return palette[h % palette.length];
 }
 
+/** 返回人物头像 HTML：有 image 字段用 <img>，否则降级 SVG 首字头。
+ *  p 兼容旧签名（{name, stance, image?}）或旧式 {name, stance}。 */
+function avatarHtml(p) {
+  const name = String((p && p.name) || '?');
+  const stance = (p && p.stance) || '';
+  const img = (p && p.image) ? '<img src="' + esc(p.image) + '" alt="' + esc(name) +
+    '" class="char-img" loading="lazy">' : avatarSvg(name, stance);
+  return img;
+}
+
 function avatarSvg(name, stance) {
   const s = String(name || '?');
   const hit = s.match(/[\u4e00-\u9fa5A-Za-z0-9]/);
@@ -604,7 +614,7 @@ function renderRoster() {
     b.className = 'roster-item' + (S.target === p.id ? ' active' : '');
     b.title = (p.role || '') + ' ·『' + (p.stance || '') + '』';
     b.innerHTML =
-      '<span class="avatar-medal">' + avatarSvg(p.name, p.stance) + '</span>' +
+      '<span class="avatar-medal">' + avatarHtml(p) + '</span>' +
       '<span class="ri-body"><b>' + esc(p.name) + '</b><small>' +
       esc(p.role || '') + (p.stance ? ' ·『' + esc(p.stance) + '』' : '') + '</small></span>';
     b.onclick = function () { pickTarget(p.id); };
@@ -623,7 +633,7 @@ function pickTarget(pid) {
 function renderFocus() {
   const p = S.target ? castList().find(function (x) { return x.id === S.target; }) : null;
   if (p) {
-    $('focusAvatar').innerHTML = avatarSvg(p.name, p.stance);
+    $('focusAvatar').innerHTML = avatarHtml(p);
     $('focusName').textContent = p.name;
     $('focusRole').textContent = (p.role || '朝臣') + (p.stance ? ' ·『' + p.stance + '』' : '');
   } else {
@@ -712,7 +722,7 @@ function bubble(kind, m) {
     (m.stance ? ' <em class="stance">' + esc(m.stance) + '</em>' : '') + '</span>' : '';
   if (kind === 'agent') {
     el.innerHTML =
-      '<span class="avatar">' + avatarSvg(m.name || '?', m.stance) + '</span>' +
+      '<span class="avatar">' + avatarHtml(m) + '</span>' +
       '<div class="body">' + whoBadge + '<p>' + esc(m.text) + '</p></div>';
   } else if (kind === 'player') {
     // 文策（诏令/改令，结算数值）与廷议问策（仅对话）在消息流里明确区分

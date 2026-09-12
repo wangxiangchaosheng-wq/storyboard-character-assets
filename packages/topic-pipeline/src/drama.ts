@@ -9,6 +9,17 @@ import type { ChatProvider } from '@sim/llm';
 import type { TopicBrief, Fact, FillResult } from '@sim/contracts';
 import type { Persona } from '@sim/engine-core';
 
+/** 来自 integrations/shijing-website 的现成人物素材库。
+ *  名称 → avatar 路径（前端 /art/<name>-avatar.webp）。
+ *  仅覆盖已知人物；不在列表中的角色回退到 SVG 首字头。 */
+const CHAR_IMAGE: Record<string, string> = {
+  '诸葛亮': '/art/zhuge-avatar.webp',
+  '魏延': '/art/weiyan-avatar.webp',
+  '杨仪': '/art/yangyi-avatar.webp',
+  '姜维': '/art/jiangwei-avatar.webp',
+  '费祎': '/art/feiyi-avatar.webp',
+};
+
 export interface DramaDraft {
   cast: Persona[];
   rounds?: number;
@@ -209,6 +220,7 @@ function dramaFromFacts(brief: TopicBrief, fill: FillResult): DramaDraft | undef
       const advPersona: Persona = {
         id: 'p0', name, role, stance: '进取',
         influence: Math.round(60 + rnd() * 30),
+        image: CHAR_IMAGE[name],
         description: claims.slice(0, 2).join('；'),
         prompt:
           `你是${name}（${role}），立场进取。` +
@@ -287,6 +299,7 @@ function dramaFromFacts(brief: TopicBrief, fill: FillResult): DramaDraft | undef
       role: roleHint(name, claims),
       stance,
       influence: Math.round(50 + rnd() * 45),
+      image: CHAR_IMAGE[name],
       description: claims.slice(0, 2).join('；'),
       prompt:
         `你是${name}（${roleHint(name, claims)}），立场${stance}。` +
@@ -565,6 +578,7 @@ function normalizeDraft(j: DramaDraft & { seedPoints?: string[] }, fill: FillRes
       role: '当事方',
       stance: idx === 0 ? '进取' : '稳守',
       influence: 50 + idx * 10,
+      image: CHAR_IMAGE[knownNames[0] ?? ''],
       description: '',
       prompt: `你是${cast[idx].name}，立场${cast[idx].stance}。发言符合身份与立场。`,
       traits: { competence: 60, loyalty: 60, ambition: 50, power: 50 },
