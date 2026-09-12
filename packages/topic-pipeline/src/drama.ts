@@ -344,8 +344,27 @@ const DRAMA_PROMPT = [
   '- background字段要直接点出这个秘密对朝局的影响；',
   '- conflict字段要用一句话概括这个秘密带来的核心矛盾。',
   '【强制约束】brief.title 和 brief.body 中出现的所有人名、朝代名、地名、年号等专有名词，',
-  '必须原样保留，禁止替换、改写、谐音、乱码生成。',
+  '必须原样保留，禁止替换、改写、谐音、乱码生成。禁止把"洪承畴"写成"洪承"，禁止把"康熙帝"写成"康熙"。',
 ].join('\n');
+
+/** 过滤LLM偶尔返回的身份/元数据JSON（如{"name":"Agnes",...}），不是有效剧本 */
+function isValidDramaJson(raw: string): boolean {
+  try {
+    const j = JSON.parse(raw);
+    if (!j || typeof j !== 'object') return false;
+    if (Array.isArray(j)) return false; // top-level array是错误格式
+    // 必须是对象且有cast数组
+    if (!Array.isArray(j.cast)) return false;
+    if (j.cast.length < 2) return false;
+    // 排除身份响应：只有name+developer/role等元字段，没有stance/role/influence
+    const firstCast = j.cast[0];
+    if (!firstCast || typeof firstCast !== 'object') return false;
+    if (!firstCast.stance || !firstCast.role || !firstCast.influence) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export async function composeDrama(
   brief: TopicBrief,
@@ -353,47 +372,115 @@ export async function composeDrama(
   chat: ChatProvider,
 ): Promise<DramaDraft | undefined> {
   // 真实 key：让 LLM 基于考据写剧本（同 schema）
-  if (chat.isReal()) {
-    try {
-      const raw = await chat.generate(
-        [
-          {
-            role: 'user',
-            content:
-              DRAMA_PROMPT +
-              `\n\n考据：\n${fill.facts.map((f, i) => `${i + 1}. ${f.claim}${f.url ? `〔${f.url}〕` : ''}`).join('\n') || '（无命中考据，需自行按常识注明「（推演）」）'}` +
-              `\n\n【话题标题】${brief.title}` +
-              `\n\n【话题原文】${brief.body ?? ''}` +
-              `\n\n【玩家问题】${(brief.asks ?? []).join('；') || '（无）'}` +
-              `\n\n⚠️ 重要指令：上述「话题原文」是玩家设定的架空前提，不是历史事实。你必须基于该前提设计剧本，不得忽略或偏离。如果原文提到了具体人物（如"洪承畴""康熙帝"），cast 中必须包含这些人物。`,
-          },
-        ],
-        { jsonMode: true, maxTokens: 4000 },
-      );
-      const j = JSON.parse(raw) as DramaDraft & {
-        seedPoints?: string[];
-      };
-      if (j?.cast?.length >= 2) return normalizeDraft(j, brief.title);
-      console.error('[composeDrama] cast不够2人:', j?.cast?.length, 'raw:', raw.slice(0,200));
-    } catch (e) {
-      console.error('[composeDrama] LLM failed:', (e as Error).message?.slice(0, 200));
+  if (chat.isReal() && fill && fill.facts) {
+    const factsText = fill.facts
+      .map((f, i) => `${i + 1}. ${f.claim}${f.url ? `〔${f.url}〕` : ''}`)
+      .join('\n') || '（无命中考据，需自行按常识注明「（推演）」）';
+    const userContent =
+      DRAMA_PROMPT +
+      `\n\n考据：\n${factsText}` +
+      `\n\n【话题标题】${brief.title}` +
+      `\n\n【话题原文】${brief.body ?? ''}` +
+      `\n\n【玩家问题】${(brief.asks ?? []).join('；') || '（无）'}` +
+      `\n\n⚠️ 重要指令：上述「话题原文」是玩家设定的架空前提，不是历史事实。你必须基于该前提设计剧本，不得忽略或偏离。如果原文提到了具体人物（如"洪承畴""康熙帝"），cast 中必须包含这些人物。`;
+
+    // 最多重试3次，用递增的 maxTokens 避免截断
+    const MAX_RETRIES = 3;
+    const TOKEN_SIZES = [6000, 8000, 10000];
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        const raw = await chat.generate([{ role: 'user', content: userContent }], {
+          jsonMode: true,
+          maxTokens: TOKEN_SIZES[attempt],
+        });
+        if (!isValidDramaJson(raw)) {
+          console.error(`[composeDrama] attempt ${attempt + 1}: invalid schema, raw:`, raw.slice(0, 150));
+          continue;
+        }
+        const j = JSON.parse(raw) as DramaDraft & { seedPoints?: string[] };
+        if (j?.cast?.length >= 2) return normalizeDraft(j, fill, brief.title);
+        console.error('[composeDrama] cast不够2人:', j?.cast?.length, 'raw:', raw.slice(0, 200));
+      } catch (e) {
+        console.error(`[composeDrama] attempt ${attempt + 1} error:`, (e as Error).message?.slice(0, 150));
+      }
     }
+    console.error('[composeDrama] 所有重试均失败，回退到确定性生成');
   }
   return dramaFromFacts(brief, fill);
 }
 
-/** 从 brief.title 中提取可能的中文名（2-3 字符，排除明显非人名片段） */
-function extractKnownNames(title: string): string[] {
-  // 先按词汇边界分割（标点、空格），再在每个片段中找 2-3 字符人名候选
-  const stopWords = new Set(['架空','历史','玩家','你','作为','如果','假如','穿越','成为','变成','他的','他将','如何','该','布局','计划','暗中','一步步','最终','推广','替换','隐藏','讨论','话题','推演','是','的','了','在','和','与','而','但','或','则','可以','必须','禁止','改写','谐音','乱码','例如','不得','虚构','替代','原文','人物','朝代','地名','年号','专有','名词','必须','原样','保留','禁止','替换','改写','谐音','乱码']);
-  const commonPhrases = new Set(['康熙帝','康熙皇','顺治帝','乾隆帝','雍正帝','皇帝','天子','陛下','万岁','朝廷','大臣','官员','汉人','满人','旗人','农民','起义','军队','兵马','战将','丞相','尚书','将军','翰林','学士','御史','太傅','太保','内阁','军机','地方','州县','百姓','平民','士绅','豪强','兼并','富户','贫民','农户','商人','官员','兵丁','绿营','八旗','满洲','满洲','汉军',' Mongol','蒙古','西藏','新疆','台湾','日本','朝鲜','俄国','法国','英国','美国','德国','西班牙','荷兰','葡萄牙','意大利','俄罗斯','印度','波斯','阿拉伯','非洲','美洲','欧洲','亚洲','大洋洲','南极洲','北极','赤道','温带','寒带','热带','雨林','沙漠','草原','高原','平原','山地','丘陵','盆地','河流','湖泊','海洋','岛屿','半岛','海峡','海湾','运河','山脉','火山','地震','台风','洪水','干旱','瘟疫','饥荒','战争','革命','改革','变法','中兴','衰落','灭亡','建国','开国','统一','分裂','割据','叛乱','起义','造反','农民','流寇','白莲','天理','太平','义和','教案','条约','割地','赔款','租借','开埠','通商','海关','厘金','关税','银两','铜钱','纸币','宝钞','交子','会子','飞钱','票号','钱庄','商帮','晋商','徽商','粤商','闽商','浙商','苏商','津商','鲁商','陕商','甘商','宁商','青商','藏商','维吾尔','哈萨克','柯尔克孜','塔吉克','乌兹别克','锡伯','达斡尔','鄂温克','鄂伦春','门巴','珞巴','独龙','怒','景颇','傈僳','基诺','布朗','德昂','毛南','京','仫佬','羌','撒拉','土','东乡','保安','裕固','俄罗斯','契丹','女真','鲜卑','匈奴','羯','氐','吐蕃','回纥','黠戛斯','党项','西夏','辽','金','元','明','清']);
+/** 从考据事实中提取已知人物名（比标题解析更可靠）——fact entity 是 LLM 已识别的人名 */
+function extractKnownPersonNames(fill: FillResult, briefTitle?: string): string[] {
+  const names = new Set<string>();
+  for (const f of fill.facts ?? []) {
+    if (!f.entity) continue;
+    // entity 可能是多个名字用顿号/逗号分隔（如"洪承畴、康熙"）
+    for (const part of f.entity.split(/[、,\s]+/)) {
+      const p = part.trim();
+      if (p.length >= 2 && p.length <= 6 && /^[\u4e00-\u9fa5]+$/.test(p)) {
+        names.add(p);
+      }
+    }
+  }
+  // 若 fact entity 不足，退回到标题解析兜底
+  if (names.size < 2 && briefTitle) {
+    for (const n of extractKnownNames(briefTitle)) names.add(n);
+  }
+  return [...names].slice(0, 8);
+}
 
-  // 提取 2-3 字符的词（不含标点分隔）
-  const words = title.split(/[：:,，。！？;；、\s]+/).filter(w => w.length >= 2 && w.length <= 4);
-  const candidates = words.filter(w => !stopWords.has(w) && !commonPhrases.has(w));
-  // 进一步过滤：排除明显是动词/形容词/介词的
-  const notName = new Set(['他是','她是','我为','我们','他们','那个','这个','哪个','怎样','如何','什么','哪里','何时','为何','因为','所以','但是','如果','虽然','即使','并且','或者','还有','以及','关于','对于','按照','根据','通过','经过','进行','正在','已经','才能','可以','应该','必须','需要','能够','可能','也许','大概','仿佛','似乎','确实','真正','实在','绝对','完全','非常','特别','十分','更加','比较','相对','相反','相同','相似','区别','差异','变化','改变','发展','进步','落后','先进','现代','古代','近代','当代','历史','文学','艺术','科学','技术','经济','政治','军事','文化','教育','思想','哲学','宗教','道德','法律','制度','政策','改革','革命','运动','事件','战争','战役','战斗','冲突','矛盾','问题','现象','情况','状态','形式','方式','方法','手段','措施','行动','行为','表现','反映','体现','展示','显示','呈现','揭示','说明','解释','论证','证明','证实','否定','质疑','批评','指责','攻击','反击','抵抗','反抗','镇压','统治','治理','管理','领导','指挥','控制','影响','作用','功能','目的','意义','价值','地位','角色','身份','资格','权利','义务','责任','权力','利益','矛盾','冲突','斗争','竞争','合作','联合','联盟','条约','协议','合同','约定','规则','标准','规范','准则','原则','方针','路线','战略','战术','部署','安排','计划','方案','策略','办法','措施','手段','方法','途径','路径','道路','方向','目标','远景','前景','未来','现在','过去','曾经','目前','当前','今后','日后','以后','之前','以前','后来','最终','最后','首先','其次','再次','然后','接着','于是','进而','从而','借此','据此','基于','鉴于','关于','对于','就','向','往','朝','自','从','由','经','过','沿','顺','随','跟','同','和','与','及','并','且','而','又','还','也','再','更','倍','最','极','很','太','过于','相当','较为','比较','略','稍','颇','较','尚','犹','尚且','依旧','仍然','还是','倒是','反而','却','但','惟','只','仅','才','便','就','乃','即','立刻','立即','马上','顿时','忽然','突然','果然','居然','竟然','依然','仍旧','照旧','照常','照旧','照旧','照旧']);
-  return [...new Set(candidates.filter(w => !notName.has(w)))].slice(0, 6);
+/** 从标题提取可能的人名片段（用于检测截断）——只返回2-4字符的纯中文段 */
+function extractKnownNames(title: string): string[] {
+  // 策略：找所有连续2-4字符中文段，但只在明显是"姓+名"模式时保留
+  const segments = title.split(/[：:，,,。！？;；、\s]+/).filter(Boolean);
+  const results: string[] = [];
+  const seen = new Set<string>();
+
+  for (const seg of segments) {
+    // 跳过明显不是人名的段（含标点、数字、英文）
+    if (!/^[\u4e00-\u9fa5]+$/.test(seg)) continue;
+    // 提取所有2-4字符子串
+    for (let len = 2; len <= 4 && len <= seg.length; len++) {
+      for (let i = 0; i <= seg.length - len; i++) {
+        const sub = seg.slice(i, i + len);
+        if (!seen.has(sub)) seen.add(sub);
+      }
+    }
+  }
+
+  // 过滤：必须是"看起来像人名"的模式
+  // 规则：
+  // 1. 不在stopWords里
+  // 2. 不以"的""了""在""是""他""她""我""我们""他们"等开头
+  // 3. 长度2-4
+  const STOP_PREFIX = new Set(['的','了','在','是','他','她','我','我们','他们','这个','那个','一个','这样','那样','什么','哪里','何时','因为','所以','如果','虽然','但是','而且','可以','应该','需要','能够','可能','也许','大概','忽然','突然','终于','开始','接着','然后','后来','最后','首先','其次','再次','还有','以及','对于','根据','通过','经过','进行','正在','已经','必须','禁止','例如','不得','虚构','替代','原文','人物','朝代','地名','年号','专有','名词','原样','保留','话题','推演','设定','用户','玩家','你','该','某']);
+  // 标准百家姓单字集合（排除"时/司/向/古"等假姓氏）
+  const SURNAME_CHARS = new Set('赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦尤许何吕施张孔曹严华金魏陶姜戚谢邹喻柏水窦章云苏潘葛奚范彭鲁韦昌马苗凤花方俞任袁柳酆鲍史唐廉岑薛雷贺倪汤滕殷罗毕郝邬安常乐于施张孔曹严华金魏陶姜戚谢邹喻柏水窦章云苏潘葛奚范彭鲁韦昌马苗凤花方俞任袁柳酆鲍史唐廉岑薛雷贺倪汤滕殷罗毕郝邬安常乐'.split(''));
+  // 额外补充常见姓氏单字（不在传统百家姓中但实际是姓的）
+  new Set('傅皮卞齐康伍余元卜顾孟平黄和穆萧尹姚邵湛汪祁毛禹狄米贝明臧计伏成戴谈宋茅庞熊纪舒屈项祝董梁杜阮蓝闵席季麻强贾路娄危江童颜郭梅盛林刁钟徐邱骆高夏蔡田樊胡凌霍虞万支柯昝管卢莫经房裘缪干解应宗丁宣贲邓郁单杭洪包诸左石崔吉钮龚程嵇邢滑裴陆荣翁荀羊於惠甄曲家封芮羿储靳汲邴糜松井段富巫乌焦巴弓牧隗山谷车侯宓蓬全郗班仰秋仲伊宁仇栾暴甘钭厉戎祖武符刘景詹束龙叶幸司韶郜黎蓟溥印宿白怀蒲邰从鄂索咸籍赖卓蔺屠蒙池乔阴胥能苍双闻莘党翟谭贡劳逄姬申扶堵冉宰郦雍璩桑桂濮牛寿通边扈燕冀郏浦尚农温别庄晏柴瞿阎充慕连茹习宦艾鱼容向古易慎戈廖庾终暨居衡步都耿满弘匡国文寇广禄阙东欧殳沃利蔚越夔隆师巩厍聂晁勾敖融冷訾辛阚那简饶空殒锺商牟佘佴伯赏宫夙禄满束东关西百酒势告利叔季儒童朴仉督子车颛孙端木巫马公西漆雕乐正壤驷公良拓跋夹谷宰父榖梁'.split('')).forEach(c => SURNAME_CHARS.add(c));
+  // 移除已知的假姓氏单字（这些在百家姓原文中是词组的一部分，不是独立姓氏）
+  SURNAME_CHARS.delete('时');
+  SURNAME_CHARS.delete('司');
+  SURNAME_CHARS.delete('向');
+  SURNAME_CHARS.delete('古');
+  SURNAME_CHARS.delete('易');
+  const filtered = [...seen].filter(w => {
+    if (w.length < 2 || w.length > 4) return false;
+    if (STOP_PREFIX.has(w.slice(0, 1))) return false;
+    if (!SURNAME_CHARS.has(w[0])) return false;
+    // 排除非人名片段（含"是""的""了"等虚词的长段）
+    if (w.length >= 4 && /是|的|了|在|于|与|而|但|或|且|以|之|乎|者|也|兮|乎/.test(w)) return false;
+    return true;
+  });
+
+  // 去重：若 final 中已有更长名字包含当前候选，则跳过候选（保留长名）
+  const final: string[] = [];
+  for (const f of filtered) {
+    // skip f if any existing x in final is longer and contains f
+    const shouldSkip = final.some(x => f !== x && x.includes(f));
+    if (!shouldSkip) final.push(f);
+  }
+  return final.slice(0, 6);
 }
 
 function isKnownName(name: string, knowns: string[]): boolean {
@@ -409,9 +496,9 @@ function findClosestKnown(name: string, knowns: string[]): string | null {
   return null;
 }
 
-function normalizeDraft(j: DramaDraft & { seedPoints?: string[] }, briefTitle?: string): DramaDraft {
-  // 验证 cast 人名：若 brief 中有明确人名，LLM 不得用其他名字替换
-  const knownNames = extractKnownNames(briefTitle ?? '');
+function normalizeDraft(j: DramaDraft & { seedPoints?: string[] }, fill: FillResult, briefTitle?: string): DramaDraft {
+  // 验证 cast 人名：优先从 fact entity 提取，兜底用标题解析
+  const knownNames = extractKnownPersonNames(fill, briefTitle);
   // 无效名字特征：包含"话题/设定/用户/你"、或纯描述性短语、或长度>8的奇怪组合
   const isInvalidName = (n: string) => {
     if (!n || n.length < 2) return true;
@@ -427,18 +514,27 @@ function normalizeDraft(j: DramaDraft & { seedPoints?: string[] }, briefTitle?: 
       const firstPart = name.split(/[,、,··_～—]/)[0].trim();
       if (firstPart && firstPart.length >= 2 && firstPart.length <= 6) name = firstPart;
       if (knownNames.length > 0) {
-        // 清理 LLM 可能生成的冗长名字（如"架空洪承畴是康熙推进方" → "洪承畴"）
-        for (const kn of knownNames) {
-          if (name.includes(kn)) {
-            name = kn;
-            break;
+        // Rule 1: exact match — 保留原样
+        if (knownNames.includes(name)) { /* no-op */ }
+        // Rule 2: name 是某已知名的前缀（如 '洪承' → '洪承畴'），从描述/prompt 验证后补全
+        else {
+          for (const kn of knownNames) {
+            if (kn.startsWith(name) && kn.length > name.length) {
+              if (c.description?.includes(kn) || c.prompt?.includes(kn)) {
+                name = kn;
+                break;
+              }
+            }
           }
         }
-        // 如果名字完全不包含任何已知名，且 LLM 生成了奇怪名字，强制修正
-        const hasKnown = knownNames.some(k => name.includes(k));
-        if (!hasKnown && name.length <= 8) {
-          const inferred = knownNames.find(k => c.description?.includes(k) || c.prompt?.includes(k));
-          if (inferred) name = inferred;
+        // Rule 3: name 明显长于已知名且包含它（如 '架空洪承畴' → '洪承畴'）
+        if (name !== (c.name ?? '').trim()) {
+          for (const kn of knownNames) {
+            if (name.includes(kn) && name.length > kn.length + 1) {
+              name = kn;
+              break;
+            }
+          }
         }
       }
       return {

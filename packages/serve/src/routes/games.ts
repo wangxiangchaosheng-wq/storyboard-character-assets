@@ -152,6 +152,14 @@ export function registerGameRoutes(app: FastifyInstance, deps: GamesDeps): void 
     });
   });
 
+  // 宽索引（仅元数据）：hash 恢复的 allowlist 查找用——前端只允许恢复索引中存在的对局
+  app.get('/api/games/index', async (_req, reply) => {
+    const rows = listGames(store, 200);
+    return reply.send({
+      games: rows.map((r) => ({ gameId: r.id, specId: r.spec_id })),
+    });
+  });
+
   // ---------- 推演历史：指标波形 + 诏令/事件时间线（复盘与走势图数据源） ----------
   app.get('/api/games/:id/history', async (req, reply) => {
     const id = (req.params as { id: string }).id;
@@ -227,6 +235,22 @@ export function registerGameRoutes(app: FastifyInstance, deps: GamesDeps): void 
     const spec = mustGameSpec(store, row.spec_id, id);
     const rt = loadSession(store, spec, row.spec_id, id);
     // spec 走对外解密视图：公式只在引擎与审校司内部，不下发给客户端
+    return reply.send({ ...toGameView(rt, spec), spec: toPublicSpec(spec) });
+  });
+
+  // POST 变体：id 走请求体，前端 hash 恢复场景用（URL 恒定，杜绝路径拼接）
+  app.post('/api/games/state', async (req, reply) => {
+    const body = (req.body ?? {}) as { id?: string };
+    const id = typeof body.id === 'string' ? body.id : '';
+    if (!id) {
+      return reply.code(400).send({ error: { code: ERROR_CODES.BAD_INPUT, message: '缺少 id' } });
+    }
+    const row = getGame(store, id);
+    if (!row) {
+      return reply.code(404).send({ error: { code: ERROR_CODES.TASK_NOT_FOUND, message: '对局不存在' } });
+    }
+    const spec = mustGameSpec(store, row.spec_id, id);
+    const rt = loadSession(store, spec, row.spec_id, id);
     return reply.send({ ...toGameView(rt, spec), spec: toPublicSpec(spec) });
   });
 
@@ -334,6 +358,20 @@ export function registerGameRoutes(app: FastifyInstance, deps: GamesDeps): void 
   // ---------- 终局 --------------------------
   app.get('/api/games/:id/ending', async (req, reply) => {
     const id = (req.params as { id: string }).id;
+    const saved = kvGet(store, ENDING_KEY(id)) as EndingView | undefined;
+    if (!saved) {
+      return reply.code(409).send({ error: { code: ERROR_CODES.INVALID_ACTION, message: '对局尚未终局' } });
+    }
+    return reply.send(saved);
+  });
+
+  // POST 变体：id 走请求体（URL 恒定）
+  app.post('/api/games/ending', async (req, reply) => {
+    const body = (req.body ?? {}) as { id?: string };
+    const id = typeof body.id === 'string' ? body.id : '';
+    if (!id) {
+      return reply.code(400).send({ error: { code: ERROR_CODES.BAD_INPUT, message: '缺少 id' } });
+    }
     const saved = kvGet(store, ENDING_KEY(id)) as EndingView | undefined;
     if (!saved) {
       return reply.code(409).send({ error: { code: ERROR_CODES.INVALID_ACTION, message: '对局尚未终局' } });

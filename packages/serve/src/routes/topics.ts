@@ -123,6 +123,24 @@ export function registerTopicRoutes(
     return reply.send({ topicId: id, spec: toPublicSpec(JSON.parse(row.spec)) });
   });
 
+  // POST 变体：id 走请求体，前端 hash 恢复场景用（URL 恒定，杜绝路径拼接）
+  app.post('/api/topics/spec', async (req, reply) => {
+    const body = (req.body ?? {}) as { id?: string };
+    const id = typeof body.id === 'string' ? body.id : '';
+    if (!id) {
+      return reply
+        .code(400)
+        .send({ error: { code: ERROR_CODES.BAD_INPUT, message: '缺少 id' } });
+    }
+    const row = getTopic(store, id);
+    if (!row || !row.spec) {
+      return reply
+        .code(404)
+        .send({ error: { code: ERROR_CODES.TASK_NOT_FOUND, message: 'spec 尚未生成' } });
+    }
+    return reply.send({ topicId: id, spec: toPublicSpec(JSON.parse(row.spec)) });
+  });
+
   app.post('/api/topics/:id/abort', async (req, reply) => {
     const id = (req.params as { id: string }).id;
     runTask.delete(id);
