@@ -1,6 +1,6 @@
 import type { Persona, TalkTask, Utterance, LLMProvider } from './types.ts';
 import type { MemoryBank } from './memory.ts';
-import { runAgentLoop, type AgentLoopOpts } from './agentLoop.ts';
+import { runAgentLoop, type AgentLoopOpts, type Tool } from './agentLoop.ts';
 import { mockPersonaReply, mockPersonaRebutt } from './mock.ts';
 
 export interface DebateOptions extends AgentLoopOpts {
@@ -16,6 +16,11 @@ export interface DebateOptions extends AgentLoopOpts {
    * 使不同番次的廷议不复读同一套台词。
    */
   questionSeed?: string;
+  /**
+   * 按角色构建其专属工具运行时（arena_three_kingdoms 的 per-agent runtime 模式）：
+   * 行动类工具（密折呈递/记忆检索）需绑定调用者身份。优先于静态 opts.tools。
+   */
+  toolsFactory?: (persona: Persona) => Tool[];
 }
 
 function toText(u: Utterance): string {
@@ -48,12 +53,14 @@ export async function runDebateRound(
     if (llm.isReal()) {
       const prior = utterances.map(toText).join('\n');
       const ctx = task.context + (prior ? `\n\n【本回合已有一位在前发言】\n${prior}` : '');
+      // per-agent 工具运行时：行动类工具绑定调用者身份（toolsFactory 优先于静态 tools）
+      const personaTools = opts.toolsFactory ? opts.toolsFactory(p) : opts.tools;
       content = await runAgentLoop(
         p,
         { ...task, context: ctx },
         memory[p.id],
         llm,
-        { ...opts, maxTokens: opts.maxTokens ?? 500 },
+        { ...opts, tools: personaTools, maxTokens: opts.maxTokens ?? 500 },
       );
     } else {
       const last = utterances.at(-1);
@@ -86,12 +93,13 @@ export async function runDebateRound(
         const ctx =
           task.context +
           `\n\n【交锋时刻】上面是全员首轮表态。请针对与你立场相左的那位，逐条回应其原话（可用工具查看局势）。\n${prior}`;
+        const personaTools = opts.toolsFactory ? opts.toolsFactory(p) : opts.tools;
         content = await runAgentLoop(
           p,
           { ...task, context: ctx },
           memory[p.id],
           llm,
-          { ...opts, maxTokens: opts.maxTokens ?? 400 },
+          { ...opts, tools: personaTools, maxTokens: opts.maxTokens ?? 400 },
         );
       } else {
         content = mockPersonaRebutt(p, task, opponents, opts.stateBlock, { seed: opts.questionSeed, round: task.round });

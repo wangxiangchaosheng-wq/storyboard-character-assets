@@ -27,6 +27,14 @@ import type { SearchProvider } from '@sim/llm';
 
 // ---------- 会话活性态（内存 + kv 持久化） ----------
 
+export interface MemorialEntry {
+  turn: number;       // 廷议回合（下诏时 = rt.turn + 1）
+  from: string;       // 角色 id
+  name: string;       // 角色名
+  stance?: string;
+  text: string;       // 密折正文
+}
+
 export interface SessionRuntime {
   gameId: string;
   specId: string;          // topics 行的 id（spec 的引出键）
@@ -43,6 +51,7 @@ export interface SessionRuntime {
   search?: SearchProvider; // 考据司搜索结果（可选，供可行性检查使用）
   prevNarrative?: string;  // 上一回合的决策落定叙事（供下轮廷议参考）
   prevState?: State;       // 上一回合结束时的数值快照
+  memorials: MemorialEntry[]; // 御前密折存档（file_memorial 工具写入，结算时史官引用）
 }
 
 const RT_KEY = (id: string) => 'game:rt:' + id;
@@ -102,28 +111,170 @@ function recentDiscourse(rt: SessionRuntime, n = 10): string {
     .join('\n');
 }
 
-// ---------- 角色工具（真实 LLM 才可调用；mock 路径经 isReal 门控不触碰） ----------
+/** 沉浸感守门（统一净化）：去推理标签、复读的"名（立场）："回声行、裸工具JSON；
+ *  返回空串表示整条废弃。 */
+function sanitizeUtterance(content: string | undefined): string {
+  let text = (content ?? '').replace(/<\/?think>/gi, '').trim();
+  // 回声行：模型复读的"角色名（立场）：……"或"自称（角色名）：……"台词头
+  text = text
+    .split('\n')
+    .filter((line) => !/^[^\n：]{1,8}（(?:进取|稳守|协商|[^）]{1,6})）：/.test(line.trim()))
+    .join('\n')
+    .trim();
+  if (!text || /^\{[\s\S]*"tool"[\s\S]*\}$/.test(text)) return '';
+  return text;
+}
 
-function buildTools(rt: SessionRuntime): Tool[] {
+// ---------- 角色工具（真实 LLM 才可调用；mock 路径经 isReal 门控不触碰） ----------
+// 设计参照 SKYLENAGE/arena_three_kingdoms 的工具层模式：
+//   · 情报分级——公开情报与私下传闻分开（probe_rumor 只给民间视角）；
+//   · 每个工具描述自带"何时用 + 输出字段"说明；
+//   · 行动类工具（file_memorial）真实影响结算——史官会引用密折落笔；
+//   · 记忆可检索（recall_memories）而非只靠注入。
+
+/** 数值快照 + 与上回合的趋势对照（↑↓ 与增减量） */
+function formatStateTrend(rt: SessionRuntime): string {
+  const base = formatState(rt.state, rt.spec.metrics);
+  if (!rt.prevState) return base;
+  const arrows = rt.spec.metrics
+    .map((m) => {
+      const now = rt.state[m.key];
+      const prev = rt.prevState?.[m.key];
+      if (!Number.isFinite(now) || typeof prev !== 'number' || !Number.isFinite(prev)) return null;
+      const d = Math.round((now - prev) * 100) / 100;
+      if (Math.abs(d) < 0.01) return `${m.label} 持平`;
+      const arrow = d > 0 ? '↑' : '↓';
+      const unit = m.unit ? ` ${m.unit}` : '';
+      return `${m.label} ${arrow} ${Math.abs(d)}${unit}`;
+    })
+    .filter(Boolean)
+    .join('  ·  ');
+  return `${base}\n较上回合：${arrows || '（初局无对照）'}`;
+}
+
+/** 民间传闻：把数值变动转译成市井流言（情报分级——民间视角，非庙堂精确数） */
+function folkRumors(rt: SessionRuntime): string {
+  const rumors: string[] = [];
+  const state = rt.state;
+  const prev = rt.prevState;
+  const metrics = rt.spec.metrics;
+  if (prev) {
+    for (const m of metrics) {
+      const now = state[m.key];
+      const old = prev[m.key];
+      if (!Number.isFinite(now) || !Number.isFinite(old)) continue;
+      const d = now - old;
+      if (Math.abs(d) < Math.max(0.5, Math.abs(old) * 0.005)) continue;
+      const label = m.label;
+      const pct = Math.round(Math.abs(d) / Math.max(1, Math.abs(old)) * 100);
+      rumors.push(
+        d > 0
+          ? `市井传言：${label}较去岁增长约${pct}%，百姓${/民户|人口/.test(label) ? '安居乐业，添丁不少' : '都说朝廷今年手气不错'}`
+          : `茶馆闲话：${label}跌了约${pct}%，${/民户|人口/.test(label) ? '有流民南下，乡里抱怨连天' : /兵/.test(label) ? '有人从军未归，家中老母哭断肠' : '粮商趁机抬价，人心惶惶'}`,
+      );
+    }
+  }
+  if (!rumors.length) {
+    rumors.push('街市如常，听闻不到什么新鲜事——至少今日如此。');
+  }
+  // 时令点缀：按回合轮转几条氛围传闻，让每次打听都不完全一样
+  const flavor = [
+    '南来客商说，边关市集比往年热闹了几分。',
+    '说书人新编了段朝堂轶事，台下听客挤得水泄不通。',
+    '有驿卒酒后失言，称某位大人的门客近日频繁夜行。',
+    '乡试放榜在即，士子们三五成群议论朝廷新政。',
+  ];
+  rumors.push(flavor[rt.turn % flavor.length]);
+  return rumors.join('\n');
+}
+
+/** 按角色构建其专属工具运行时（arena 模式：行动类工具绑定调用者身份） */
+function buildTools(rt: SessionRuntime, me: Persona): Tool[] {
+  const cast = rt.spec.cast;
   return [
     {
       name: 'view_state',
-      description: '查看当前朝局各项数值（如民户、兵额、岁入等），掌握真实家底后再表态',
-      run: async () => formatState(rt.state, rt.spec.metrics),
+      description: '查看当前朝局各项数值（民户、兵额、岁入等）及与上回合的增减趋势。表态前先摸清家底。',
+      run: async () => formatStateTrend(rt),
     },
     {
       name: 'inspect_recent',
-      description: '翻阅最近几则朝议笔录（主上与同僚发言），以接住前文、回应他人',
+      description: '翻阅最近几则朝议笔录（主上与同僚发言）。用于接住前文、回应他人的具体原话。',
       run: async (args: Record<string, unknown>) => {
         const n = Math.min(10, Math.max(1, Number(args?.n ?? 5) || 5));
         return recentDiscourse(rt, n);
+      },
+    },
+    {
+      name: 'inspect_colleague',
+      description: '探某位同僚的底细（公开情报）：立场、职务、声望、近期主张。交锋或结盟前先知人善任。'
+        + '输出: {姓名, 职务, 立场, 声望, 简介, 近期主张[]}。参数 name 用同僚姓名（如"鳌拜"）。',
+      run: async (args: Record<string, unknown>) => {
+        const q = String(args?.name ?? '').trim();
+        if (!q) return '请传入要探听的同僚姓名（name 参数）。';
+        const target = cast.find((c) => c.name.includes(q) || q.includes(c.name));
+        if (!target) {
+          return `朝中查无此人：「${q}」。在列者：${cast.map((c) => c.name).join('、')}。`;
+        }
+        const mem = rt.memory[target.id];
+        const positions = (mem?.history ?? [])
+          .slice(-3)
+          .map((h) => '- ' + h.slice(0, 80));
+        return [
+          `姓名：${target.name}（${target.role}）`,
+          `立场：${target.stance ?? '未明'}｜声望：${target.influence ?? '?'}/100`,
+          `简介：${(target.description ?? '').slice(0, 120)}`,
+          positions.length ? `近期主张：\n${positions.join('\n')}` : '近期主张：无可查记录',
+        ].join('\n');
+      },
+    },
+    {
+      name: 'recall_memories',
+      description: '检索自己的记忆库（你亲历的朝议、你听说的旧事）。被同僚翻旧账、或需援引自己先前主张时用。'
+        + '输出: 相关记忆条目列表。参数 keywords 为关键词（如"粮草"、"密折"），top_k 为条数上限（默认5）。',
+      run: async (args: Record<string, unknown>) => {
+        const kw = String(args?.keywords ?? '').trim();
+        if (!kw) return '请传入检索关键词（keywords 参数）。';
+        const topK = Math.min(8, Math.max(1, Number(args?.top_k ?? 5) || 5));
+        const history = rt.memory[me.id]?.history ?? [];
+        const hits = history.filter((h) => h.includes(kw)).slice(-topK);
+        if (!hits.length) {
+          return `记忆中检不到与「${kw}」相关的内容（共 ${history.length} 条记忆）。`;
+        }
+        return `你关于「${kw}」的记忆（近 ${hits.length} 条）：\n` + hits.map((h) => '- ' + h.slice(0, 160)).join('\n');
+      },
+    },
+    {
+      name: 'probe_rumor',
+      description: '差人去市井茶馆打听民间风声。数值变动会以流言形式体现——官方口径之外的民心温度计。'
+        + '输出: 数条民间传闻。',
+      run: async () => folkRumors(rt),
+    },
+    {
+      name: 'file_memorial',
+      description: `向御前呈递密折（以 ${me.name} 的名义私下存档，不入公开朝议）：把你的核心主张/条件/警告写成呈文。`
+        + '史官结算政令时会阅及所有密折。参数 text 为密折正文（200 字内为佳，须以你的身份口吻）。',
+      run: async (args: Record<string, unknown>) => {
+        const text = String(args?.text ?? '').trim();
+        if (!text) return '密折正文不可为空（text 参数）。';
+        if (text.length > 400) return '密折务求简要，正文请控制在 400 字内。';
+        rt.memorials.push({
+          turn: rt.turn + 1,
+          from: me.id,
+          name: me.name,
+          stance: me.stance,
+          text,
+        });
+        return `密折已以 ${me.name} 之名呈递御前（存档完毕）。史官结算时将阅及。`;
       },
     },
   ];
 }
 
 /** 层级记忆：把一轮廷议写回记忆 —— 按发言者各自摘录自己的话，
- *  而不是给全员塞同一条；角色在后续回合只带回与自己相关的记忆。 */
+ *  而不是给全员塞同一条；角色在后续回合只带回与自己相关的记忆。
+ *  另（arena 的 general_impression 模式）：发言中点名他人时，被点名者
+ *  的记忆里也会留下"谁在朝议上提到过我、说了什么"。 */
 function absorbUtterances(memory: MemoryBank, cast: Persona[], utterances: Utterance[]): MemoryBank {
   const out: MemoryBank = { ...memory };
   for (const u of utterances) {
@@ -132,6 +283,14 @@ function absorbUtterances(memory: MemoryBank, cast: Persona[], utterances: Utter
     const mem = out[u.speaker] ?? { longTerm: p.prompt, currentTurn: [], history: [] };
     const digest = `${u.speakerName}（${u.stance ?? ''}）：${u.content.slice(0, MEM_DIGEST_LEN)}…`;
     out[u.speaker] = { ...mem, history: [...(mem.history ?? []), digest].slice(-MEM_HISTORY_CAP) };
+    // 被点名者印象：发言正文提到他人姓名（≥2字、非自己）→ 写入对方记忆
+    for (const other of cast) {
+      if (other.id === u.speaker) continue;
+      if (!u.content.includes(other.name)) continue;
+      const om = out[other.id] ?? { longTerm: other.prompt, currentTurn: [], history: [] };
+      const impression = `（印象）${u.speakerName}在朝议上提及你：「${u.content.replace(/\s+/g, ' ').slice(0, 100)}…」`;
+      out[other.id] = { ...om, history: [...(om.history ?? []), impression].slice(-MEM_HISTORY_CAP) };
+    }
   }
   return out;
 }
@@ -151,6 +310,7 @@ function saveRt(store: Store, rt: SessionRuntime): void {
     endedAt: rt.endedAt,
     prevNarrative: rt.prevNarrative,
     prevState: rt.prevState,
+    memorials: rt.memorials,
   });
 }
 
@@ -173,6 +333,7 @@ function loadRt(store: Store, spec: ScenarioSpec, specId: string, gameId: string
         search?: SearchProvider;
         prevNarrative?: string;
         prevState?: State;
+        memorials?: MemorialEntry[];
       }
     | undefined;
   return {
@@ -183,6 +344,7 @@ function loadRt(store: Store, spec: ScenarioSpec, specId: string, gameId: string
     state: base?.state ?? createState(spec.metrics),
     initialState: base?.initialState ?? createState(spec.metrics),
     turn: base?.turn ?? 0,
+    memorials: base?.memorials ?? [],
     chat: base?.chat ?? [],
     seq: base?.seq ?? 0,
     memory: normalizeMemory(base?.memory, spec.cast),
@@ -230,6 +392,7 @@ export async function startSession(
     status: 'awaiting',
     endedAt: null,
     search,
+    memorials: [],
   };
 
   rt.chat.push(makeMsg(rt, 'system', openingNarrative(spec), { name: '史官' }));
@@ -240,14 +403,11 @@ export async function startSession(
   const utterances = await runDebateRound(spec.cast, task, llm, rt.memory, {
     stateBlock,
     passes: 2, // 表态 + 交锋：全员针对对立立场回应，真正的廷议对弈
-    tools: llm.isReal() ? buildTools(rt) : undefined,
+    toolsFactory: llm.isReal() ? (p) => buildTools(rt, p) : undefined,
   });
   for (const u of utterances) {
-    // 沉浸感守门：空发言 / 裸工具JSON / 推理标签 / 前位发言者回声 一律不入对话流
-    let text = (u.content ?? '').replace(/<\/?think>/gi, '').trim();
-    // 去除模型复读的他人发言行（如"康熙帝（稳守）：……"）
-    text = text.split('\n').filter((line) => !/^[^\n：]{1,8}（(?:进取|稳守|协商)）：/.test(line.trim())).join('\n').trim();
-    if (!text || /^\{[\s\S]*"tool"[\s\S]*\}$/.test(text)) continue;
+    const text = sanitizeUtterance(u.content);
+    if (!text) continue;
     rt.chat.push(makeMsg(rt, 'agent', text, { from: u.speaker, name: u.speakerName, stance: u.stance }));
   }
   rt.memory = absorbUtterances(rt.memory, spec.cast, utterances);
@@ -307,7 +467,6 @@ export async function handleMessage(
 
   if (req.act) {
     // ---- 下诏：先让群臣就这道诏令廷议一轮（后发言者接前文），再规则漂移、再结算 ----
-    const tools = llm.isReal() ? buildTools(rt) : undefined;
     // 注入上一回合的决策落定叙事和数值变化，让本轮廷议有上下文
     const prevContext = rt.prevNarrative
       ? `\n【上回合政令落定】${rt.prevNarrative.slice(0, 400)}`
@@ -324,11 +483,13 @@ export async function handleMessage(
     const council = await runDebateRound(spec.cast, decreeTask, llm, rt.memory, {
       stateBlock,
       passes: 2, // 表态 + 交锋
-      tools,
+      toolsFactory: (p) => buildTools(rt, p), // per-agent 工具运行时（密折署名/记忆检索按角色绑定）
       questionSeed: text, // 让 mock 就诏令原话对答，而非复读老台词
     });
     for (const u of council) {
-      const m = makeMsg(rt, 'agent', u.content, { from: u.speaker, name: u.speakerName, stance: u.stance });
+      const text = sanitizeUtterance(u.content);
+      if (!text) continue;
+      const m = makeMsg(rt, 'agent', text, { from: u.speaker, name: u.speakerName, stance: u.stance });
       rt.chat.push(m);
       added.push(m);
     }
@@ -337,7 +498,13 @@ export async function handleMessage(
     // 时势自然脉动（规则漂移），再进入执行结算
     const driftDeltas = applyDrift(rt.state, spec.rules, spec.metrics);
     const drifted = applyDeltas(rt.state, driftDeltas, spec.metrics);
-    const debateSummary = recentDiscourse(rt);
+    // 御前密折（file_memorial 存档）注入结算摘要：史官落笔时阅及群臣密奏
+    const pendingMemorials = rt.memorials.filter((m) => m.turn === rt.turn + 1);
+    const memorialDigest = pendingMemorials.length
+      ? '\n\n【御前密折存档】（群臣私下呈递，史官结算时应参酌）\n'
+        + pendingMemorials.map((m) => `- ${m.name || '（未署名）'}（${m.stance || ''}）：${m.text.slice(0, 200)}`).join('\n')
+      : '';
+    const debateSummary = recentDiscourse(rt) + memorialDigest;
 
     // 可行性检查：下诏决策前检索史实，评估是否可行
     let feasibilityMsg: ChatMessage | undefined;
@@ -392,6 +559,8 @@ export async function handleMessage(
     rt.prevState = { ...rt.state };
     rt.memory = pushMemory(rt.memory, spec.cast,
       '命令' + rt.turn + '「' + text.slice(0, 60) + '」：' + settlement.narrative);
+    // 已被史官阅及的密折留档转存档（按回合清出，防止重复注入结算）
+    rt.memorials = rt.memorials.filter((m) => m.turn !== rt.turn);
     saveRt(store, rt);
     // 每道诏令落定即存一帧快照：指标波形 / 时势时间线 / 复盘全靠它
     appendTurn(store, rt.gameId, rt.turn, {
@@ -407,11 +576,13 @@ export async function handleMessage(
   const stateBlock = formatState(rt.state, spec.metrics);
   const task = talkTaskFor(spec, rt.turn + 1);
   const replies = await askPersona(spec.cast, req.to, task, llm, rt.memory, text, stateBlock, {
-    tools: llm.isReal() ? buildTools(rt) : undefined,
+    toolsFactory: llm.isReal() ? (p) => buildTools(rt, p) : undefined,
     passes: 2,
   });
   for (const r of replies) {
-    const m = makeMsg(rt, 'agent', r.content, {
+    const text = sanitizeUtterance(r.content);
+    if (!text) continue;
+    const m = makeMsg(rt, 'agent', text, {
       from: r.speaker, name: r.speakerName, stance: r.stance,
     });
     rt.chat.push(m);

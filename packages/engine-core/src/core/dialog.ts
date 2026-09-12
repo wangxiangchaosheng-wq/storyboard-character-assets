@@ -15,6 +15,8 @@ export interface DialogOptions {
   maxTokens?: number;
   /** 角色可调用的工具（如看数值/看最近笔录）；真实 LLM 才真正执行 */
   tools?: Tool[];
+  /** 按角色构建其专属工具运行时（行动类工具需绑定调用者身份）。优先于静态 tools。 */
+  toolsFactory?: (persona: Persona) => Tool[];
   /** 全场廷议时的交锋轮数（见 debate.ts 的 passes） */
   passes?: number;
 }
@@ -71,7 +73,11 @@ export async function askPersona(
           },
           memory[target.id],
           llm,
-          { stateBlock, maxTokens: opts.maxTokens ?? 600, tools: opts.tools },
+          {
+            stateBlock,
+            maxTokens: opts.maxTokens ?? 600,
+            tools: opts.toolsFactory ? opts.toolsFactory(target) : opts.tools,
+          },
         )
       : mockPersonaChat(target, playerText, stateBlock);
     return [{ speaker: target.id, speakerName: target.name, stance: target.stance, content }];
@@ -83,7 +89,14 @@ export async function askPersona(
     { ...task, context: task.context + `\n玩家（主上）刚才说话：${playerText}` },
     llm,
     memory,
-    { stateBlock, maxTokens: opts.maxTokens ?? 500, tools: opts.tools, passes: opts.passes, questionSeed: playerText },
+    {
+      stateBlock,
+      maxTokens: opts.maxTokens ?? 500,
+      tools: opts.tools,
+      toolsFactory: opts.toolsFactory,
+      passes: opts.passes,
+      questionSeed: playerText,
+    },
   );
   return utterances.map((u) => ({
     speaker: u.speaker,

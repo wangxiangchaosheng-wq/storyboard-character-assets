@@ -39,6 +39,15 @@ function buildSystem(p: Persona, task: TalkTask, tools: Tool[], stateBlock?: str
 /** 从文本中移除平衡的工具调用 JSON（从含 "tool" 键的 { 起到配对 } 止） */
 function stripToolJson(text: string): string {
   let out = text;
+  // 第 0 步：正则兜底——模型常输出缺前花括号/裸 key 的畸形调用（如 `"tool":"x","args":{...}}`），
+  // 平衡扫描会因起点缺失而漏删，先用宽容正则整体剥除（含可选外层花括号）
+  for (let pass = 0; pass < 3; pass++) {
+    const prev = out;
+    out = out
+      .replace(/\{?\s*"?tool"?\s*:\s*"[^"]*"\s*,\s*"?args"?\s*:\s*\{[^{}]*\}\s*,?\s*\}?/g, '')
+      .trim();
+    if (out === prev) break;
+  }
   for (let pass = 0; pass < 6; pass++) {
     const m = out.match(/"tool"\s*:\s*"/);
     if (!m || m.index === undefined) break;
