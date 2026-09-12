@@ -246,7 +246,7 @@ function buildTools(rt: SessionRuntime, me: Persona): Tool[] {
     },
     {
       name: 'probe_rumor',
-      description: '差人去市井茶馆打听民间风声。数值变动会以流言形式体现——官方口径之外的民心温度计。'
+      description: '差人去市井茶馆打听民间风声。数值变动会以流言形式体现——官方口径之外的民情风向标。'
         + '输出: 数条民间传闻。',
       run: async () => folkRumors(rt),
     },

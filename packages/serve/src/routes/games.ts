@@ -28,7 +28,7 @@ import type { SearchProvider } from '@sim/llm';
 function buildSearchFromFill(fill: { claims: string[] }): SearchProvider {
   // 补充两线作战关键史实（pipeline BM25 对短查询命中率低，此处兜底）
   const extraFacts = [
-    '诸葛亮北伐最多同时对付一个方向，从未敢两线开战，以国力悬殊为根本原因。',
+    '诸葛亮北伐最多同时对付一个方向，从未敢两线开战，以邦力悬殊为根本原因。',
     '两线作战需要兵力达到对手单线的1.5倍以上才可能成功。',
     '蜀汉人口不足魏国四分之一，军队后勤多依赖汉中屯田。',
   ];
