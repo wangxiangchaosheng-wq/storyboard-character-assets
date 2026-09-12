@@ -62,7 +62,8 @@ export function registerTopicRoutes(
         .send({ error: { code: ERROR_CODES.TASK_RUNNING, message: '任务已运行' } });
     }
     runTask.add(id);
-    saveTopic(store, id, { status: 'running' });
+    // 清除上一轮构建的陈旧产物：重建期间 spec/brief/fill 一律为空，防止端点吐旧规格
+    saveTopic(store, id, { status: 'running', brief: null, fill: null, spec: null });
     reply.code(202).send({ accepted: true });
 
     // 后台执行：阶段状态写库（status 各节点经 saveTopic），进度事件经 SSE 推送

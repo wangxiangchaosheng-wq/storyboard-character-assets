@@ -395,6 +395,8 @@ export function deriveNumbersOffline(
     for (const c of numberCluesFromText(src.text)) {
       if (seenCue.has(clueKey(c))) continue;
       seenCue.add(clueKey(c));
+      // 名词无效（约为/估算/年份等虚词或元数据）→ 不构指标
+      if (!isValidMetricLabel(c.noun)) continue;
       const u = NUM_UNIT[c.unit];
       pushMetric(
         `${c.noun}（${c.unit}）`,

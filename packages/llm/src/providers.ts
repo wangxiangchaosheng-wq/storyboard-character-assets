@@ -13,8 +13,10 @@ export interface ChatMessage {
 export interface CompletionOpts {
   temperature?: number;
   maxTokens?: number;
-  /** 强制输出 JSON（外层解析失败会重试 1 次再降级） */
+  /** 强制输出 JSON（外层解析失败会重试 1 旿1 次再降级） */
   jsonMode?: boolean;
+  /** 请求超时毫秒（默认 30s；长 JSON 生成场景应调大） */
+  timeoutMs?: number;
 }
 
 export interface StreamChunk {
@@ -156,7 +158,7 @@ export class OpenAICompatibleChat implements ChatProvider {
         max_tokens: opts.maxTokens ?? 900,
         response_format: opts.jsonMode ? { type: 'json_object' } : undefined,
       }),
-      timeoutMs: 30_000,
+      timeoutMs: opts.timeoutMs ?? 30_000,
     });
     if (!res.ok) {
       if (res.status === 429) throw new AppError('4003', `LLM 限流 ${res.status}`);

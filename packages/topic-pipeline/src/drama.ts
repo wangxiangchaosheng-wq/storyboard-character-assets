@@ -392,6 +392,7 @@ export async function composeDrama(
         const raw = await chat.generate([{ role: 'user', content: userContent }], {
           jsonMode: true,
           maxTokens: TOKEN_SIZES[attempt],
+          timeoutMs: 120_000,
         });
         if (!isValidDramaJson(raw)) {
           console.error(`[composeDrama] attempt ${attempt + 1}: invalid schema, raw:`, raw.slice(0, 150));
@@ -541,8 +542,16 @@ function normalizeDraft(j: DramaDraft & { seedPoints?: string[] }, fill: FillRes
         ...c,
         id: `p${i + 1}`,
         name,
-        // role 太长则截断，保留第一个 / 之前的部分
-        role: c.role ? (c.role.length > 8 ? c.role.split(/[\/\\\\]/)[0].trim().slice(0, 8) : c.role) : '当事方',
+        // role 太长则截断，保留第一个 / 之前的部分；清洗拉丁残渣（如"SU 拜"）
+        role: c.role
+          ? (() => {
+              let r = String(c.role).split(/[/\\]/)[0].trim().slice(0, 8);
+              // 去除与中文混杂的孤立拉丁残渣（保留纯英文专名如"AI"）
+              const cjk = r.replace(/[A-Za-z0-9\s]+/g, '').trim();
+              if (cjk.length >= 2) r = cjk;
+              return r || '当事方';
+            })()
+          : '当事方',
         description: c.description ?? '',
         traits: c.traits ?? { competence: 60, loyalty: 60, ambition: 50, power: 50 },
       };

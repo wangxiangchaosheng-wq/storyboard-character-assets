@@ -243,7 +243,12 @@ export async function startSession(
     tools: llm.isReal() ? buildTools(rt) : undefined,
   });
   for (const u of utterances) {
-    rt.chat.push(makeMsg(rt, 'agent', u.content, { from: u.speaker, name: u.speakerName, stance: u.stance }));
+    // 沉浸感守门：空发言 / 裸工具JSON / 推理标签 / 前位发言者回声 一律不入对话流
+    let text = (u.content ?? '').replace(/<\/?think>/gi, '').trim();
+    // 去除模型复读的他人发言行（如"康熙帝（稳守）：……"）
+    text = text.split('\n').filter((line) => !/^[^\n：]{1,8}（(?:进取|稳守|协商)）：/.test(line.trim())).join('\n').trim();
+    if (!text || /^\{[\s\S]*"tool"[\s\S]*\}$/.test(text)) continue;
+    rt.chat.push(makeMsg(rt, 'agent', text, { from: u.speaker, name: u.speakerName, stance: u.stance }));
   }
   rt.memory = absorbUtterances(rt.memory, spec.cast, utterances);
 

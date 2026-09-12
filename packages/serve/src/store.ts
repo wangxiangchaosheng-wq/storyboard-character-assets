@@ -118,7 +118,10 @@ export function saveTopic(
     ? JSON.stringify(patch.brief)
     : (existing?.brief ?? null);
   const fill = patch.fill !== undefined ? JSON.stringify(patch.fill) : (existing?.fill ?? null);
-  const spec = patch.spec !== undefined ? JSON.stringify(patch.spec) : (existing?.spec ?? null);
+  // 'spec' in patch 且值为 null => 清除既有产物；未传则保留
+  const spec = 'spec' in patch
+    ? (patch.spec == null ? null : JSON.stringify(patch.spec))
+    : (existing?.spec ?? null);
   store
     .prepare(
       [
