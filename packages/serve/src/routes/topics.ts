@@ -17,7 +17,20 @@ import { toPublicSpec } from '../publicSpec.ts';
 
 const ingestSchema = z.union([
   z.object({ kind: z.literal('text'), text: z.string().min(1).max(50_000) }),
-  z.object({ kind: z.literal('url'), url: z.string().url() }),
+  z.object({
+    kind: z.literal('url'),
+    url: z
+      .string()
+      .url()
+      .refine((u) => {
+        try {
+          const { protocol } = new URL(u);
+          return protocol === 'http:' || protocol === 'https:';
+        } catch {
+          return false;
+        }
+      }, '仅允许 http/https 协议'),
+  }),
 ]);
 
 export function registerTopicRoutes(

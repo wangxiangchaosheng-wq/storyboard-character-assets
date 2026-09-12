@@ -111,17 +111,34 @@ function mockReaction(
 ): Delta[] {
   const out: Delta[] = [];
   // 从意图中提取方向暗示词，帮助判断"好方向"
+  // 扩大词表覆盖更多决策场景（军事/财政/民生）
   const intentLower = (decision.intent ?? '').toLowerCase();
-  const positiveWords = ['进取', '主动', '进攻', '出击', '扩张', '增收', '增兵', '安民', '振兴', '图强', '果断', '行动', '改革', '变法'];
-  const negativeWords = ['保守', '退守', '收缩', '削减', '停战', '和谈', '减少', '裁员', '精简'];
-  function intentDirection(): 'positive' | 'negative' | 'neutral' {
-    const pos = positiveWords.filter((w) => intentLower.includes(w)).length;
-    const neg = negativeWords.filter((w) => intentLower.includes(w)).length;
-    if (pos > neg) return 'positive';
-    if (neg > pos) return 'negative';
-    return 'neutral';
+  const positiveWords = [
+    '进取', '主动', '进攻', '出击', '扩张', '增收', '增兵', '安民', '振兴', '图强', '果断', '行动', '改革', '变法',
+    '积极', '加快', '推进', '加大', '增加', '扩大', '扩充', '招揽', '招募',
+  ];
+  const negativeWords = [
+    '保守', '退守', '收缩', '削减', '停战', '和谈', '减少', '裁员', '精简',
+    '消极', '放缓', '缩减', '降低', '减弱', '收缩',
+  ];
+  // 领域特定词：财政类
+  const taxWords = { pos: ['增收', '加税', '增饷', '聚财'], neg: ['减税', '免税', '减免', '休养生息'] };
+  // 军事类
+  const militaryWords = { pos: ['出兵', '征伐', '北伐', '攻取', '主动出击'], neg: ['退守', '罢兵', '和议'] };
+  // 民生类
+  const peopleWords = { pos: ['赈灾', '安民', '救灾', '蠲免', '减免赋税'], neg: ['加派', '重税', '苛敛'] };
+
+  function countHits(words: string[]): number {
+    return words.filter(w => intentLower.includes(w)).length;
   }
-  const dir = intentDirection();
+  const taxPos = countHits(taxWords.pos), taxNeg = countHits(taxWords.neg);
+  const milPos = countHits(militaryWords.pos), milNeg = countHits(militaryWords.neg);
+  const pplPos = countHits(peopleWords.pos), pplNeg = countHits(peopleWords.neg);
+  const genPos = countHits(positiveWords), genNeg = countHits(negativeWords);
+
+  // 综合评分：正分 > 0 → positive，负分 < 0 → negative，否则 neutral
+  const score = (taxPos - taxNeg) * 2 + (milPos - milNeg) * 2 + (pplPos - pplNeg) * 1 + (genPos - genNeg) * 1;
+  const dir = score > 0 ? 'positive' : score < 0 ? 'negative' : 'neutral';
   for (const r of rules) {
     if (r.kind !== 'reaction') continue;
     for (const key of r.appliesTo ?? []) {

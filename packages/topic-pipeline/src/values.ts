@@ -37,6 +37,8 @@ function buildEraContext(text: string): string {
     return '北宋熙宁：民户约2000万、兵额约120万、岁入约400万两、粮储约600万石。';
   if (/安史|唐.*叛|玄宗/.test(text))
     return '盛唐天宝：民户约3000万、兵额约200万、岁入约500万两、粮储约800万石。';
+  if (/康熙|顺治|雍正|乾隆|洪承畴|清.*初|爱新觉罗|八旗|满.*清|清宫|清朝|清朝初/.test(text))
+    return '清初（顺康时期）：民户约2000万、兵额约80万、岁入约300万两、粮储约500万石。';
   return '';
 }
 
@@ -96,6 +98,19 @@ function sanitizeFormula(formula: string, metricKeys: string[]): string {
   return sanitized.trim() || '0';
 }
 
+/** 垃圾指标黑名单：LLM 可能瞎编的无效指标，直接过滤 */
+const BAD_METRIC_PATTERNS = [
+  '相差', '约为', '约略', '估算', '推定', '估计', '推测', '假设',
+  '未知', '无效', '垃圾', '测试', '年份', '年数', '时间', '时长',
+  '日期', '年龄', '年代',
+];
+
+/** 检查 label 是否为有效历史科目（黑名单过滤） */
+function isValidMetricLabel(label: string): boolean {
+  if (!label || label.length < 2) return false;
+  return !BAD_METRIC_PATTERNS.some(p => label.includes(p));
+}
+
 export function parseNumbers(raw: string): DerivedNumbers | null {
   type J = Record<string, unknown>;
   let obj: J | null = null;
@@ -108,7 +123,7 @@ export function parseNumbers(raw: string): DerivedNumbers | null {
   }
   if (!obj || !Array.isArray(obj.metrics) || !Array.isArray(obj.rules)) return null;
   if (obj.metrics.length < 4 || obj.rules.length < 5) return null; // 结构不足 → 上层转离线
-  const metrics: MetricDef[] = ((obj.metrics ?? []) as J[]).map((m) => ({
+  const allMetrics: MetricDef[] = ((obj.metrics ?? []) as J[]).map((m) => ({
     key: String(m.key),
     label: String(m.label ?? m.key),
     min: Number(m.min ?? 0),
@@ -118,6 +133,13 @@ export function parseNumbers(raw: string): DerivedNumbers | null {
     higherIsBetter: m.higherIsBetter !== false,
     description: String(m.description ?? ''),
   }));
+  // 过滤掉 LLM 瞎编的垃圾指标（如"相差（年）""约为（年）"等）
+  const validMetrics = allMetrics.filter(m => isValidMetricLabel(m.label));
+  if (validMetrics.length < 4) {
+    // 有效指标不足4个，说明 LLM 输出质量差，回退到离线推导
+    return null;
+  }
+  const metrics = validMetrics;
   const provenance: ProvenanceNote[] = ((obj.metrics ?? []) as J[]).map((m) => ({
     metric: String(m.key),
     source: String((m.provenance as J | undefined)?.source ?? ''),
@@ -217,12 +239,22 @@ const HIST_BASLINE: Record<string, Partial<Record<string, number>>> = {
   明末: { '民户': 1600, '粮储': 400, '岁入': 200, '兵额': 80 },
   王安石: { '民户': 2000, '粮储': 600, '岁入': 400, '兵额': 120 },
   安史: { '民户': 3000, '粮储': 800, '岁入': 500, '兵额': 200 },
+  // 清朝（顺治/康熙/雍正/乾隆等）
+  清朝: { '民户': 2000, '粮储': 500, '岁入': 300, '兵额': 80 },
+  清:   { '民户': 2000, '粮储': 500, '岁入': 300, '兵额': 80 },
+  康熙: { '民户': 2000, '粮储': 500, '岁入': 300, '兵额': 80 },
+  顺治: { '民户': 1600, '粮储': 400, '岁入': 200, '兵额': 80 },
+  雍正: { '民户': 2400, '粮储': 600, '岁入': 400, '兵额': 100 },
+  乾隆: { '民户': 3000, '粮储': 800, '岁入': 500, '兵额': 120 },
+  洪承畴: { '民户': 1600, '粮储': 400, '岁入': 200, '兵额': 80 },
 };
 function topicDomainHint(text: string): string {
-  if (/三国|蜀|魏|吴|诸葛亮|北伐|赤壁|赤壁/.test(text)) return '三国';
-  if (/崇祯|明.*末|李自成|农民|起义|明.*亡/.test(text)) return '明末';
+  if (/三国|蜀|魏|吴|诸葛亮|北伐/.test(text)) return '三国';
+  if (/崇祯|明.*末|李自成|农民起义|明.*亡/.test(text)) return '明末';
   if (/王安石|变法|宋/.test(text)) return '王安石';
   if (/安史|唐.*叛|玄宗/.test(text)) return '安史';
+  // 清朝相关
+  if (/康熙|顺治|雍正|乾隆|洪承畴|清.*初|爱新觉罗|八旗|满.*清|清宫/.test(text)) return '清朝';
   return '';
 }
 function applyHistBaseline(starts: Record<string, number>, text: string): Record<string, number> {
@@ -402,7 +434,7 @@ export function deriveNumbersOffline(
   }
 
 // ③ 规则：drift / reaction / threshold —— 每个指标都拥有自己的 drift 公式、
-  //    一条覆盖全科目的 reaction（每指标各自的 bounds）、以及低线（30%）+ 高线（80%）双阈值，
+  //    一条覆盖全科目的 reaction（每指标各自的 bounds）、以及低线（20%）+ 高线（85%）双阈值，
   //    参数全部由指标定义推导（不写死任何绝对数值）。
   const reactBounds: Record<string, number> = {};
   // 各指标分配不同的漂移周期与相位，避免四条公式长得一模一样
@@ -412,7 +444,7 @@ export function deriveNumbersOffline(
     const m = metrics[idx]!;
     const period = PERIODS[idx % PERIODS.length];
     const phase  = PHASES[idx % PHASES.length];
-    const driftScale = Math.max(1, Math.round(m.max * 0.012)); // 约1.2%脉动（比0.8%略宽）
+    const driftScale = Math.max(1, Math.round(m.max * 0.006)); // 约0.6%脉动（降低振幅防过快衰减）
     const formula = m.higherIsBetter
       ? `round(${m.key}*0.003) + ${driftScale} * (((r + ${phase}) % ${period}) - ${Math.floor(period/2)})`
       : `round(${m.key}*0.003) - ${driftScale} * (((r + ${phase}) % ${period}) - ${Math.floor(period/2)})`;
@@ -442,10 +474,11 @@ export function deriveNumbersOffline(
     why: `玩家处置的效应幅度取各指标区间上限的 8%（原15%偏高，下调防一回合爆表）：${metrics.map((m) => `${m.label} 区间 0-${m.max} → ±${reactBounds[m.key]}`).join('；')}`,
     ref: '按模拟惯例（决策反馈不超过区间 8%，保证数值稳定性）推导',
   });
-  // ④ 阈值规则：每个指标各一条低线（30% 崩危）与一条高线（80% 盈溢），
+  // ④ 阈值规则：每个指标各一条低线（20% 崩危）与一条高线（85% 盈溢），
   //    任一科目越线都要在面板上拉响预警（UI 按 spec.rules 全量匹配）。
+  //    低线从30%降至20%：避免早期就频繁触发烽火事件干扰对局体验
   for (const m of metrics) {
-    const line = Math.max(1, Math.round(m.max * 0.3));
+    const line = Math.max(1, Math.round(m.max * 0.2));
     rules.push({
       id: 'th-crisis-' + m.key, kind: 'threshold', label: '底线告警',
       description: `「${m.label}」跌破 ${line} 时触发事件`,
@@ -457,7 +490,7 @@ export function deriveNumbersOffline(
       why: `低线取该指标区间上限的 30%：${m.label} 上限 ${m.max}，跌破 ${line} 即告急（可依史料中「支撑不住」的记载调至更贴近真实线）`,
       ref: `模拟惯例（危险带 = 下限起的 30%）；指标 ${m.label}（${m.key}）`,
     });
-    const summit = Math.max(1, Math.round(m.max * 0.8));
+    const summit = Math.max(1, Math.round(m.max * 0.85));
     rules.push({
       id: 'th-summit-' + m.key, kind: 'threshold', label: '高线告警',
       description: `「${m.label}」超过 ${summit} 时触发事件`,
@@ -497,6 +530,26 @@ export async function deriveNumbers(
       if (d && d.metrics.length >= 4 && d.rules.length >= 5) {
         // LLM 返回的数值可能严重偏离历史量纲，用基线校正
         applyHistBaselineToMetrics(d.metrics, brief.title + ' ' + (brief.body ?? ''), domain);
+        // 对 LLM 生成的 drift 公式做后处理：单调剂（不含 r 或 %）→ 替换为振荡公式
+        const metricKeys = d.metrics.map((m) => m.key);
+        const periods = [5, 7, 4, 6];
+        const phases = [0, 1, 3, 2];
+        for (let i = 0; i < d.rules.length; i++) {
+          const r = d.rules[i];
+          if (r.kind !== 'drift' || !r.formula) continue;
+          const f = String(r.formula);
+          const hasOscillate = /r[%\s*+\-/*)]/.test(f) || /%/.test(f) || /\br\b/.test(f);
+          if (hasOscillate) continue; // 已有 r 变量或取模，跳过
+          const m = d.metrics[i % d.metrics.length];
+          if (!m) continue;
+          const scale = Math.max(1, Math.round(m.max * 0.006));
+          const period = periods[i % periods.length];
+          const phase = phases[i % phases.length];
+          r.formula = m.higherIsBetter
+            ? `round(${m.key}*0.003) + ${scale} * (((r + ${phase}) % ${period}) - ${Math.floor(period/2)})`
+            : `round(${m.key}*0.003) - ${scale} * (((r + ${phase}) % ${period}) - ${Math.floor(period/2)})`;
+          r.label = `${m.label}的自然演化`;
+        }
         return d;
       }
     } catch {

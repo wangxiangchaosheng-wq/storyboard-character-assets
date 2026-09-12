@@ -17,7 +17,7 @@ export interface AgentLoopOpts {
 
 function buildSystem(p: Persona, task: TalkTask, tools: Tool[], stateBlock?: string): string {
   const toolDesc = tools.length
-    ? `\n可用工具：\n${tools.map((t) => `- ${t.name}：${t.description}`).join('\n')}\n如需调用，只回复 JSON：{"tool":"name","args":{...}}。`
+    ? `\n可用工具：\n${tools.map((t) => `- ${t.name}：${t.description}`).join('\n')}\n如需调用工具，请在自然语言发言之后，另起一行加上工具调用JSON，例如：{"tool":"view_state","args":{}}。工具结果将补充在你的发言中。`
     : '';
   const stateDesc = stateBlock
     ? `\n【当前局势数值】（你应参考这些数字来表态，注意它们会随推演变化）\n${stateBlock}\n`
@@ -26,7 +26,9 @@ function buildSystem(p: Persona, task: TalkTask, tools: Tool[], stateBlock?: str
     `${p.prompt}\n\n你正在参与一场多智能体推演。\n` +
     `当前议题：${task.topic}\n${task.context}\n` +
     `${stateDesc}` +
-    `请以你的立场发言，必要时提出主张或反驳。${toolDesc}`
+    `请以你的立场发言，必要时提出主张或反驳。\n` +
+    `【重要】你必须始终用自然语言发言。工具调用只是辅助——在调用工具之后，你必须根据工具返回的结果给出你的立场陈述。` +
+    `即使你需要调用工具查看状态，也请先用一句话说明你的意图，再调用工具，再根据结果表态。\n${toolDesc}`
   );
 }
 
@@ -103,7 +105,19 @@ export async function runAgentLoop(
       messages.push({ role: 'tool', content: result });
       continue;
     }
-    finalText = raw;
+    // 正常回复：迭代清理工具JSON残片（处理嵌套括号和<tool_calls>标签）
+    let cleaned = raw;
+    for (let pass = 0; pass < 10; pass++) {
+      const prev = cleaned;
+      // 移除 <tool_calls>…</tool_calls> 块
+      cleaned = cleaned.replace(/<tool_calls>[\s\S]*?<\/tool_calls>/g, '').trim();
+      // 移除单行/多行 JSON 工具调用（含嵌套括号）
+      cleaned = cleaned.replace(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*"tool"\s*:\s*"[^"]+"[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '').trim();
+      if (cleaned === prev) break;
+    }
+    // 如果清理后几乎没有文字内容（纯工具JSON），标记为空
+    const toolOnly = /^\s*\{[\s\S]*"tool"\s*:/m.test(cleaned) && cleaned.replace(/\{[^{}]*"tool"[^{}]*\}/g, '').trim().length < 20;
+    finalText = toolOnly ? '' : (cleaned || raw);
     break;
   }
   return finalText;

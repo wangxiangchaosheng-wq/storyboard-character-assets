@@ -41,11 +41,14 @@ export interface SessionRuntime {
   status: 'awaiting' | 'final';
   endedAt: number | null;
   search?: SearchProvider; // 考据司搜索结果（可选，供可行性检查使用）
+  prevNarrative?: string;  // 上一回合的决策落定叙事（供下轮廷议参考）
+  prevState?: State;       // 上一回合结束时的数值快照
 }
 
 const RT_KEY = (id: string) => 'game:rt:' + id;
 const ENDING_KEY = (id: string) => 'game:ending:' + id;
-const MEM_HISTORY_CAP = 16;
+const MEM_HISTORY_CAP = 32;
+const MEM_DIGEST_LEN = 200;
 
 /** 从 topics 表恢复考据司产出（史实/估算条目），供可行性引擎使用。 */
 export function getTopicFill(store: Store, specId: string): { claims: string[] } | undefined {
@@ -127,7 +130,7 @@ function absorbUtterances(memory: MemoryBank, cast: Persona[], utterances: Utter
     const p = cast.find((c) => c.id === u.speaker);
     if (!p) continue;
     const mem = out[u.speaker] ?? { longTerm: p.prompt, currentTurn: [], history: [] };
-    const digest = `${u.speakerName}（${u.stance ?? ''}）：${u.content.slice(0, 90)}…`;
+    const digest = `${u.speakerName}（${u.stance ?? ''}）：${u.content.slice(0, MEM_DIGEST_LEN)}…`;
     out[u.speaker] = { ...mem, history: [...(mem.history ?? []), digest].slice(-MEM_HISTORY_CAP) };
   }
   return out;
@@ -146,7 +149,19 @@ function saveRt(store: Store, rt: SessionRuntime): void {
     player: rt.player,
     status: rt.status,
     endedAt: rt.endedAt,
+    prevNarrative: rt.prevNarrative,
+    prevState: rt.prevState,
   });
+}
+
+function normalizeMemory(memory: MemoryBank | undefined, cast: Persona[]): MemoryBank {
+  const out: MemoryBank = { ...(memory ?? {}) };
+  for (const p of cast) {
+    if (!out[p.id]) {
+      out[p.id] = { longTerm: p.prompt, currentTurn: [], history: [] };
+    }
+  }
+  return out;
 }
 
 function loadRt(store: Store, spec: ScenarioSpec, specId: string, gameId: string, search?: SearchProvider): SessionRuntime {
@@ -156,6 +171,8 @@ function loadRt(store: Store, spec: ScenarioSpec, specId: string, gameId: string
         seq?: number; memory?: MemoryBank; player?: string;
         status?: SessionRuntime['status']; endedAt?: number | null;
         search?: SearchProvider;
+        prevNarrative?: string;
+        prevState?: State;
       }
     | undefined;
   return {
@@ -168,10 +185,12 @@ function loadRt(store: Store, spec: ScenarioSpec, specId: string, gameId: string
     turn: base?.turn ?? 0,
     chat: base?.chat ?? [],
     seq: base?.seq ?? 0,
-    memory: base?.memory ?? initMemory(spec.cast),
+    memory: normalizeMemory(base?.memory, spec.cast),
     status: base?.status ?? 'awaiting',
     endedAt: base?.endedAt ?? null,
     search: base?.search ?? search,
+    prevNarrative: base?.prevNarrative,
+    prevState: base?.prevState,
   };
 }
 
@@ -273,8 +292,8 @@ export async function handleMessage(
     throw new AppError(ERROR_CODES.BAD_INPUT, '消息内容不可为空');
   }
   assertPersona(rt, req.to);
-  if (text.length > 400) {
-    throw new AppError(ERROR_CODES.BAD_INPUT, '一言尽意，单条消息请勿超过 400 字');
+  if (text.length > 800) {
+    throw new AppError(ERROR_CODES.BAD_INPUT, '一言尽意，单条消息请勿超过 800 字');
   }
 
   const playerMsg = makeMsg(rt, 'player', text, { act: req.act ?? false });
@@ -284,10 +303,17 @@ export async function handleMessage(
   if (req.act) {
     // ---- 下诏：先让群臣就这道诏令廷议一轮（后发言者接前文），再规则漂移、再结算 ----
     const tools = llm.isReal() ? buildTools(rt) : undefined;
+    // 注入上一回合的决策落定叙事和数值变化，让本轮廷议有上下文
+    const prevContext = rt.prevNarrative
+      ? `\n【上回合政令落定】${rt.prevNarrative.slice(0, 400)}`
+      : '';
+    const prevStat = rt.prevState
+      ? `\n【上回合终局数值】民户${rt.prevState['m1']?.toFixed(0)}万/岁入${rt.prevState['m3']?.toFixed(0)}万两/粮储${rt.prevState['m2']?.toFixed(0)}万石/兵额${rt.prevState['m4']?.toFixed(0)}万`
+      : '';
     const decreeTask: TalkTask = {
       round: rt.turn + 1,
       topic: `主上下诏：「${text.slice(0, 30)}」—— 群臣既奉诏命，先论可否得失。`,
-      context: `主上（玩家）刚颁布诏令：「${text}」\n此诏关乎朝局，诸臣议论后交由主上裁决落地。`,
+      context: `主上（玩家）刚颁布诏令：「${text}」\n此诏关乎朝局，诸臣议论后交由主上裁决落地。${prevContext}${prevStat}`,
     };
     const stateBlock = formatState(rt.state, spec.metrics);
     const council = await runDebateRound(spec.cast, decreeTask, llm, rt.memory, {
@@ -356,6 +382,9 @@ export async function handleMessage(
 
     rt.state = stateAfter;
     rt.turn += 1;
+    // 保存上一回合的叙事和数值快照，供下轮廷议引用
+    rt.prevNarrative = settlement.narrative;
+    rt.prevState = { ...rt.state };
     rt.memory = pushMemory(rt.memory, spec.cast,
       '命令' + rt.turn + '「' + text.slice(0, 60) + '」：' + settlement.narrative);
     saveRt(store, rt);
@@ -560,7 +589,7 @@ interface ReformPlan {
 
 /** 名字候选过滤：功能字/单字动词（出现在候选里即非人名） */
 const FUNCTION_CHARS = new Set(
-  '的了呢吧吗啊呀哦把将被对着从往在于是而或并并且与和及以之乎者也很更最皆都还又再便就则即才只不没未无让使令请来去出入上下中里内外前后为任掌领守将相帅臣卿吾我你他她它谁何哪这那各每某本该其此乎中换罢废贬拜封选提擢调征召遣派主向',
+  '的了呢吧吗啊呀哦把将被对着从往在于是而或并并且与和及以之乎者也很更最皆都还又再便就则即才只不没未无让使令请来去出入上下中里内外前后为任掌领守将相帅臣卿吾我你他她它谁何哪这那各每某本该其此乎中换罢废贬拜封选提擢调征召遣派主向接',
 );
 
 /** 名字候选过滤：常见朝政/叙事/副词（作为「确定不是名字」的跨度被消耗掉，绝不入名） */
@@ -672,7 +701,7 @@ function novelNameCandidates(text: string, spec: ScenarioSpec): string[] {
 }
 
 const POLARITY_PUSH = ['进取', '主战', '推进', '改革', '开拓', '积极', '激进', '快刀', '当断'];
-const POLARITY_HOLD = ['稳守', '持重', '保守', '稳健', '谨慎', '缓行', '观望', '按兵', '从长'];
+const POLARITY_HOLD = ['稳守', '持重', '保守', '稳健', '谨慎', '缓行', '观望', '按兵', '从长', '主守'];
 
 function parseReformPlan(text: string, spec: ScenarioSpec): ReformPlan {
   const push = POLARITY_PUSH.reduce((n, w) => n + (text.includes(w) ? 1 : 0), 0);
@@ -921,8 +950,8 @@ export async function reformGame(
   if (!clean) {
     throw new AppError(ERROR_CODES.BAD_INPUT, '改令内容不可为空');
   }
-  if (clean.length > 400) {
-    throw new AppError(ERROR_CODES.BAD_INPUT, '改令一言尽意，请勿超过 400 字');
+  if (clean.length > 800) {
+    throw new AppError(ERROR_CODES.BAD_INPUT, '改令一言尽意，请勿超过 800 字');
   }
 
   const playerMsg = makeMsg(rt, 'player', clean, { act: true });

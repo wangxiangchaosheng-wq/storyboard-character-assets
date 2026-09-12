@@ -219,7 +219,7 @@ test('e2e：消息校验（未知局 / 空话 / 无此人 / 终局取结）', as
   const long = await app.inject({
     method: 'POST',
     url: `/api/games/${gameId}/message`,
-    payload: { text: '长'.repeat(401) },
+    payload: { text: '长'.repeat(801) },
   });
   assert.equal(long.statusCode, 400);
   const noOne = await app.inject({

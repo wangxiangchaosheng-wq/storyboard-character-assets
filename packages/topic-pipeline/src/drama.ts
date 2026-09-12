@@ -245,7 +245,7 @@ function dramaFromFacts(brief: TopicBrief, fill: FillResult): DramaDraft | undef
       const solid = facts.filter((f) => !f.estimated);
       return {
         cast: [advPersona, hedgePersona],
-        rounds: Math.min(5, Math.max(3, 2 + Math.floor(solid.length / 3))),
+        rounds: Math.min(10, Math.max(5, 2 + Math.floor(solid.length / 3))),
         seedEvents: solid.slice(0, 4).map((f) => f.claim + (f.url ? `〔${f.url}〕` : '')),
         background: solid.slice(0, 3).map((f) => f.claim).join('；'),
         conflict: `${brief.title}——${name}主张进取，${name}（稳守派）主张持重，各方各执己见。`,
@@ -330,10 +330,21 @@ function dramaFromFacts(brief: TopicBrief, fill: FillResult): DramaDraft | undef
 
 const DRAMA_PROMPT = [
   '你是历史推演引擎的「构演司」：把考据出的史实/开题设计成一局可推演的剧本。只输出 JSON（不要代码块）：',
-  '{"cast":[{"name":"人名","role":"职务/身份","stance":"进取或稳守或协商","influence":0-100,"description":"典实简介","traits":{"competence":0-100,"loyalty":0-100,"ambition":0-100,"power":0-100}}],"rounds":3,"seedEvents":["事件1","事件2"],"background":"背景（罗列考据）","conflict":"核心矛盾","decisionPoint":"玩家最终裁决","successCriteria":"通关标准"}',
-  '要求：cast 2~4 人且 stance 必须出现对立；一切人物与事件只能来自考据或你说的「（推演）」——无考据凭空处不可硬编人名。',
-  '玩家提示词是最高指令：它可指向任意年代与地区（含「数十年后」的人物换代），可指定/更换/增删任意人物与阵营——',
-  '照玩家给的名单来，不套任何固定阵容；玩家没提的部分才按考据补齐。',
+  '{"cast":[{"name":"人名","role":"职务/身份","stance":"进取或稳守或协商","influence":0-100,"description":"典实简介","prompt":"私有人设指令（包含该角色知道什么秘密、想达到什么目的、如何对待其他角色）","traits":{"competence":0-100,"loyalty":0-100,"ambition":0-100,"power":0-100}}],"rounds":8,"seedEvents":["事件1","事件2"],"background":"背景","conflict":"核心矛盾","decisionPoint":"玩家最终裁决","successCriteria":"通关标准"}',
+  '要求：',
+  '1) cast 6~8 人（人多才有戏！覆盖朝廷各方势力：皇帝、后妃、满洲重臣、汉臣、旗人贵族、太监等）；',
+  '2) stance 必须多样化：至少 2 个"进取"、2 个"稳守"、1~2 个"协商"，立场对立越明显越好；',
+  '3) 必须包含 brief.title/body 中出现的所有具体人名（如"洪承畴""康熙帝"等），不得遗漏；',
+  '4) 其余人物从该朝代的史实中选取代表性人物，可注明「（推演）」表示架空补充；',
+  '5) 每个角色要有鲜明的人设和利益诉求，不能千人一面——进取方要激进、稳守方要保守、协商方要圆滑；',
+  '6) 一切人物与事件只能来自考据或你说的「（推演）」——无考据凭空处不可硬编人名。',
+  '【关键剧情设计】brief.body中描述的架空前提，必须在cast的description和prompt中体现，并作为剧情核心张力：',
+  '- 如果body提到"秘密身份"/"隐藏身份"/"私生子"等，必须让知道这个秘密的角色（如孝庄、皇帝本人）在prompt中写明他们知道什么、打算怎么做；',
+  '- 其他角色可能怀疑、猜测或利用这个秘密，形成暗线冲突；',
+  '- background字段要直接点出这个秘密对朝局的影响；',
+  '- conflict字段要用一句话概括这个秘密带来的核心矛盾。',
+  '【强制约束】brief.title 和 brief.body 中出现的所有人名、朝代名、地名、年号等专有名词，',
+  '必须原样保留，禁止替换、改写、谐音、乱码生成。',
 ].join('\n');
 
 export async function composeDrama(
@@ -351,32 +362,112 @@ export async function composeDrama(
             content:
               DRAMA_PROMPT +
               `\n\n考据：\n${fill.facts.map((f, i) => `${i + 1}. ${f.claim}${f.url ? `〔${f.url}〕` : ''}`).join('\n') || '（无命中考据，需自行按常识注明「（推演）」）'}` +
-              `\n\n话题：${brief.title}\n原文：${brief.body.slice(0, 1500)}\n存疑句：${brief.asks[0] ?? ''}`,
+              `\n\n【话题标题】${brief.title}` +
+              `\n\n【话题原文】${brief.body ?? ''}` +
+              `\n\n【玩家问题】${(brief.asks ?? []).join('；') || '（无）'}` +
+              `\n\n⚠️ 重要指令：上述「话题原文」是玩家设定的架空前提，不是历史事实。你必须基于该前提设计剧本，不得忽略或偏离。如果原文提到了具体人物（如"洪承畴""康熙帝"），cast 中必须包含这些人物。`,
           },
         ],
-        { jsonMode: true },
+        { jsonMode: true, maxTokens: 4000 },
       );
       const j = JSON.parse(raw) as DramaDraft & {
         seedPoints?: string[];
       };
-      if (j?.cast?.length >= 2) return normalizeDraft(j);
-    } catch {
-      /* JSON 不合规 → mock 启发式 */
+      if (j?.cast?.length >= 2) return normalizeDraft(j, brief.title);
+      console.error('[composeDrama] cast不够2人:', j?.cast?.length, 'raw:', raw.slice(0,200));
+    } catch (e) {
+      console.error('[composeDrama] LLM failed:', (e as Error).message?.slice(0, 200));
     }
   }
   return dramaFromFacts(brief, fill);
 }
 
-function normalizeDraft(j: DramaDraft & { seedPoints?: string[] }): DramaDraft {
-  const cast: Persona[] = (j.cast ?? []).map((c, i) => ({
-    ...c,
-    id: `p${i + 1}`,
-    description: c.description ?? '',
-    traits: c.traits ?? { competence: 60, loyalty: 60, ambition: 50, power: 50 },
-  }));
+/** 从 brief.title 中提取可能的中文名（2-3 字符，排除明显非人名片段） */
+function extractKnownNames(title: string): string[] {
+  // 先按词汇边界分割（标点、空格），再在每个片段中找 2-3 字符人名候选
+  const stopWords = new Set(['架空','历史','玩家','你','作为','如果','假如','穿越','成为','变成','他的','他将','如何','该','布局','计划','暗中','一步步','最终','推广','替换','隐藏','讨论','话题','推演','是','的','了','在','和','与','而','但','或','则','可以','必须','禁止','改写','谐音','乱码','例如','不得','虚构','替代','原文','人物','朝代','地名','年号','专有','名词','必须','原样','保留','禁止','替换','改写','谐音','乱码']);
+  const commonPhrases = new Set(['康熙帝','康熙皇','顺治帝','乾隆帝','雍正帝','皇帝','天子','陛下','万岁','朝廷','大臣','官员','汉人','满人','旗人','农民','起义','军队','兵马','战将','丞相','尚书','将军','翰林','学士','御史','太傅','太保','内阁','军机','地方','州县','百姓','平民','士绅','豪强','兼并','富户','贫民','农户','商人','官员','兵丁','绿营','八旗','满洲','满洲','汉军',' Mongol','蒙古','西藏','新疆','台湾','日本','朝鲜','俄国','法国','英国','美国','德国','西班牙','荷兰','葡萄牙','意大利','俄罗斯','印度','波斯','阿拉伯','非洲','美洲','欧洲','亚洲','大洋洲','南极洲','北极','赤道','温带','寒带','热带','雨林','沙漠','草原','高原','平原','山地','丘陵','盆地','河流','湖泊','海洋','岛屿','半岛','海峡','海湾','运河','山脉','火山','地震','台风','洪水','干旱','瘟疫','饥荒','战争','革命','改革','变法','中兴','衰落','灭亡','建国','开国','统一','分裂','割据','叛乱','起义','造反','农民','流寇','白莲','天理','太平','义和','教案','条约','割地','赔款','租借','开埠','通商','海关','厘金','关税','银两','铜钱','纸币','宝钞','交子','会子','飞钱','票号','钱庄','商帮','晋商','徽商','粤商','闽商','浙商','苏商','津商','鲁商','陕商','甘商','宁商','青商','藏商','维吾尔','哈萨克','柯尔克孜','塔吉克','乌兹别克','锡伯','达斡尔','鄂温克','鄂伦春','门巴','珞巴','独龙','怒','景颇','傈僳','基诺','布朗','德昂','毛南','京','仫佬','羌','撒拉','土','东乡','保安','裕固','俄罗斯','契丹','女真','鲜卑','匈奴','羯','氐','吐蕃','回纥','黠戛斯','党项','西夏','辽','金','元','明','清']);
+
+  // 提取 2-3 字符的词（不含标点分隔）
+  const words = title.split(/[：:,，。！？;；、\s]+/).filter(w => w.length >= 2 && w.length <= 4);
+  const candidates = words.filter(w => !stopWords.has(w) && !commonPhrases.has(w));
+  // 进一步过滤：排除明显是动词/形容词/介词的
+  const notName = new Set(['他是','她是','我为','我们','他们','那个','这个','哪个','怎样','如何','什么','哪里','何时','为何','因为','所以','但是','如果','虽然','即使','并且','或者','还有','以及','关于','对于','按照','根据','通过','经过','进行','正在','已经','才能','可以','应该','必须','需要','能够','可能','也许','大概','仿佛','似乎','确实','真正','实在','绝对','完全','非常','特别','十分','更加','比较','相对','相反','相同','相似','区别','差异','变化','改变','发展','进步','落后','先进','现代','古代','近代','当代','历史','文学','艺术','科学','技术','经济','政治','军事','文化','教育','思想','哲学','宗教','道德','法律','制度','政策','改革','革命','运动','事件','战争','战役','战斗','冲突','矛盾','问题','现象','情况','状态','形式','方式','方法','手段','措施','行动','行为','表现','反映','体现','展示','显示','呈现','揭示','说明','解释','论证','证明','证实','否定','质疑','批评','指责','攻击','反击','抵抗','反抗','镇压','统治','治理','管理','领导','指挥','控制','影响','作用','功能','目的','意义','价值','地位','角色','身份','资格','权利','义务','责任','权力','利益','矛盾','冲突','斗争','竞争','合作','联合','联盟','条约','协议','合同','约定','规则','标准','规范','准则','原则','方针','路线','战略','战术','部署','安排','计划','方案','策略','办法','措施','手段','方法','途径','路径','道路','方向','目标','远景','前景','未来','现在','过去','曾经','目前','当前','今后','日后','以后','之前','以前','后来','最终','最后','首先','其次','再次','然后','接着','于是','进而','从而','借此','据此','基于','鉴于','关于','对于','就','向','往','朝','自','从','由','经','过','沿','顺','随','跟','同','和','与','及','并','且','而','又','还','也','再','更','倍','最','极','很','太','过于','相当','较为','比较','略','稍','颇','较','尚','犹','尚且','依旧','仍然','还是','倒是','反而','却','但','惟','只','仅','才','便','就','乃','即','立刻','立即','马上','顿时','忽然','突然','果然','居然','竟然','依然','仍旧','照旧','照常','照旧','照旧','照旧']);
+  return [...new Set(candidates.filter(w => !notName.has(w)))].slice(0, 6);
+}
+
+function isKnownName(name: string, knowns: string[]): boolean {
+  if (knowns.includes(name)) return true;
+  // 部分匹配：cast 名包含已知名，或已知名包含 cast 名
+  return knowns.some(k => name.includes(k) || k.includes(name));
+}
+
+function findClosestKnown(name: string, knowns: string[]): string | null {
+  for (const k of knowns) {
+    if (name.includes(k) || k.includes(name)) return k;
+  }
+  return null;
+}
+
+function normalizeDraft(j: DramaDraft & { seedPoints?: string[] }, briefTitle?: string): DramaDraft {
+  // 验证 cast 人名：若 brief 中有明确人名，LLM 不得用其他名字替换
+  const knownNames = extractKnownNames(briefTitle ?? '');
+  // 无效名字特征：包含"话题/设定/用户/你"、或纯描述性短语、或长度>8的奇怪组合
+  const isInvalidName = (n: string) => {
+    if (!n || n.length < 2) return true;
+    if (/^(话题|设定|用户|玩家|你|他|她|它|该|某)/.test(n)) return true;
+    if (n.length > 8) return true;
+    return false;
+  };
+  const cast: Persona[] = (j.cast ?? [])
+    .filter(c => !isInvalidName(c.name ?? '')) // 过滤垃圾名字
+    .map((c, i) => {
+      let name = (c.name ?? '').trim();
+      // 先按标点分割，取第一段（处理"洪承畴、康熙"这类复合名）
+      const firstPart = name.split(/[,、,··_～—]/)[0].trim();
+      if (firstPart && firstPart.length >= 2 && firstPart.length <= 6) name = firstPart;
+      if (knownNames.length > 0) {
+        // 清理 LLM 可能生成的冗长名字（如"架空洪承畴是康熙推进方" → "洪承畴"）
+        for (const kn of knownNames) {
+          if (name.includes(kn)) {
+            name = kn;
+            break;
+          }
+        }
+        // 如果名字完全不包含任何已知名，且 LLM 生成了奇怪名字，强制修正
+        const hasKnown = knownNames.some(k => name.includes(k));
+        if (!hasKnown && name.length <= 8) {
+          const inferred = knownNames.find(k => c.description?.includes(k) || c.prompt?.includes(k));
+          if (inferred) name = inferred;
+        }
+      }
+      return {
+        ...c,
+        id: `p${i + 1}`,
+        name,
+        // role 太长则截断，保留第一个 / 之前的部分
+        role: c.role ? (c.role.length > 8 ? c.role.split(/[\/\\\\]/)[0].trim().slice(0, 8) : c.role) : '当事方',
+        description: c.description ?? '',
+        traits: c.traits ?? { competence: 60, loyalty: 60, ambition: 50, power: 50 },
+      };
+    });
+  // 确保至少有 2 个 cast 成员
+  while (cast.length < 2) {
+    const idx = cast.length;
+    cast.push({
+      id: `p${idx + 1}`,
+      name: idx === 0 ? (knownNames[0] ?? '当事方') : (knownNames[0] ?? '当事方') + '（稳守派）',
+      role: '当事方',
+      stance: idx === 0 ? '进取' : '稳守',
+      influence: 50 + idx * 10,
+      description: '',
+      prompt: `你是${cast[idx].name}，立场${cast[idx].stance}。发言符合身份与立场。`,
+      traits: { competence: 60, loyalty: 60, ambition: 50, power: 50 },
+    });
+  }
   return {
     cast,
-    rounds: Math.min(5, Math.max(3, Number(j.rounds) || 3)),
+    rounds: Math.min(10, Math.max(5, Number(j.rounds) || 5)),
     seedEvents: Array.isArray(j.seedEvents) ? j.seedEvents : (j.seedPoints ?? []),
     background: j.background ?? '',
     conflict: j.conflict ?? '',
