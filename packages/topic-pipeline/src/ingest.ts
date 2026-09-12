@@ -81,10 +81,12 @@ export async function ingestTopic(input: TopicInput): Promise<TopicBrief> {
   }
 
   if (!body) {
-    throw new AppError(
-      ERROR_CODES.BAD_INPUT,
-      `该站点拦截了服务端抓取（HTTP ${lastStatus || 'ERR'}）。请把话题标题/正文直接粘贴为文本开始，效果完全相同。`,
-    );
+    // 给前端更明确的下一步指引：知乎反爬通常意味着 zhihu-cli 未认证 / 已触发限流；
+    // 用户可以直接粘贴话题标题或正文，体验完全一致
+    const hint = isZhihu
+      ? '知乎拒绝了直连抓取。请先确认 zhihu-cli 已登录（运行 `zhihu-cli auth status`），或将话题标题/正文直接粘贴到输入框（效果完全相同）。'
+      : `该站点拦截了服务端抓取（HTTP ${lastStatus || 'ERR'}）。请把话题标题/正文直接粘贴为文本开始，效果完全相同。`;
+    throw new AppError(ERROR_CODES.BAD_INPUT, hint);
   }
 
   const firstLine = (title || body.split('\n')[0] || input.url).trim();
