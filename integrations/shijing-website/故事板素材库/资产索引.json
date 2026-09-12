@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "generationMethod": "built-in image_gen，未调用用户API",
+  "assets": [
+    {
+      "id": "01-hanzhong",
+      "title": "汉中誓师",
+      "file": "01-汉中誓师.png",
+      "stage": "整军待发",
+      "nature": "历史题材概念演绎",
+      "caption": "汉中整军待发，北望关山路远。",
+      "width": 942,
+      "height": 1670,
+      "requestedAspectRatio": "452:801",
+      "exactAspectRatio": false,
+      "ratioDeviationPercent": -0.039,
+      "renderHint": {
+        "fit": "contain",
+        "blendMode": "multiply",
+        "transparent": false
+      },
+      "outcome": "未描绘胜败",
+      "usage": "仅在主题、阶段和人物设定匹配时复用；不能用作胜利、失守、病逝或现代学生专属画面。"
+    },
+    {
+      "id": "02-council",
+      "title": "军帐议事",
+      "file": "02-军帐议事.png",
+      "stage": "军帐议策",
+      "nature": "历史题材概念演绎",
+      "caption": "军帐共商进退，一策须问粮道。",
+      "width": 1003,
+      "height": 1569,
+      "requestedAspectRatio": "452:801",
+      "exactAspectRatio": false,
+      "ratioDeviationPercent": 13.285,
+      "renderHint": {
+        "fit": "contain",
+        "blendMode": "multiply",
+        "transparent": false
+      },
+      "outcome": "未描绘胜败",
+      "usage": "仅在主题、阶段和人物设定匹配时复用；不能用作胜利、失守、病逝或现代学生专属画面。"
+    },
+    {
+      "id": "03-ziwu",
+      "title": "子午谷险道",
+      "file": "03-子午谷险道.png",
+      "stage": "方案设想",
+      "nature": "方案设想",
+      "caption": "子午险道通秦，奇谋尚待权衡。",
+      "width": 1003,
+      "height": 1568,
+      "requestedAspectRatio": "452:801",
+      "exactAspectRatio": false,
+      "ratioDeviationPercent": 13.357,
+      "renderHint": {
+        "fit": "contain",
+        "blendMode": "multiply",
+        "transparent": false
+      },
+      "outcome": "未描绘胜败",
+      "usage": "仅在主题、阶段和人物设定匹配时复用；不能用作胜利、失守、病逝或现代学生专属画面。"
+    },
+    {
+      "id": "04-qishan",
+      "title": "祁山进军",
+      "file": "04-祁山进军.png",
+      "stage": "进军",
+      "nature": "历史题材概念演绎",
+      "caption": "旌旗渐近祁山，进退皆系粮道。",
+      "width": 942,
+      "height": 1670,
+      "requestedAspectRatio": "452:801",
+      "exactAspectRatio": false,
+      "ratioDeviationPercent": -0.039,
+      "renderHint": {
+        "fit": "contain",
+        "blendMode": "multiply",
+        "transparent": false
+      },
+      "outcome": "未描绘胜败",
+      "usage": "仅在主题、阶段和人物设定匹配时复用；不能用作胜利、失守、病逝或现代学生专属画面。"
+    },
+    {
+      "id": "05-jieting",
+      "title": "街亭布防",
+      "file": "05-街亭布防.png",
+      "stage": "战前布防",
+      "nature": "历史题材概念演绎",
+      "caption": "街亭当道设防，山水之间定策。",
+      "width": 1003,
+      "height": 1569,
+      "requestedAspectRatio": "452:801",
+      "exactAspectRatio": false,
+      "ratioDeviationPercent": 13.285,
+      "renderHint": {
+        "fit": "contain",
+        "blendMode": "multiply",
+        "transparent": false
+      },
+      "outcome": "未描绘胜败",
+      "usage": "仅在主题、阶段和人物设定匹配时复用；不能用作胜利、失守、病逝或现代学生专属画面。"
+    },
+    {
+      "id": "06-chencang",
+      "title": "陈仓攻坚",
+      "file": "06-陈仓攻坚.png",
+      "stage": "攻坚未决",
+      "nature": "历史题材概念演绎",
+      "caption": "陈仓坚城在前，攻守更问时机。",
+      "width": 1003,
+      "height": 1569,
+      "requestedAspectRatio": "452:801",
+      "exactAspectRatio": false,
+      "ratioDeviationPercent": 13.285,
+      "renderHint": {
+        "fit": "contain",
+        "blendMode": "multiply",
+        "transparent": false
+      },
+      "outcome": "未描绘胜败",
+      "usage": "仅在主题、阶段和人物设定匹配时复用；不能用作胜利、失守、病逝或现代学生专属画面。"
+    },
+    {
+      "id": "07-supply",
+      "title": "蜀道运粮",
+      "file": "07-蜀道运粮.png",
+      "stage": "后勤转输",
+      "nature": "历史题材概念演绎",
+      "caption": "蜀道转输艰险，一粮牵动三军。",
+      "width": 1003,
+      "height": 1569,
+      "requestedAspectRatio": "452:801",
+      "exactAspectRatio": false,
+      "ratioDeviationPercent": 13.285,
+      "renderHint": {
+        "fit": "contain",
+        "blendMode": "multiply",
+        "transparent": false
+      },
+      "outcome": "未描绘胜败",
+      "usage": "仅在主题、阶段和人物设定匹配时复用；不能用作胜利、失守、病逝或现代学生专属画面。"
+    },
+    {
+      "id": "08-wuzhang",
+      "title": "五丈原对峙",
+      "file": "08-五丈原对峙.png",
+      "stage": "相持屯田",
+      "nature": "历史题材概念演绎",
+      "caption": "两军相持渭滨，屯田以待天时。",
+      "width": 1003,
+      "height": 1569,
+      "requestedAspectRatio": "452:801",
+      "exactAspectRatio": false,
+      "ratioDeviationPercent": 13.285,
+      "renderHint": {
+        "fit": "contain",
+        "blendMode": "multiply",
+        "transparent": false
+      },
+      "outcome": "未描绘胜败",
+      "usage": "仅在主题、阶段和人物设定匹配时复用；不能用作胜利、失守、病逝或现代学生专属画面。"
+    },
+    {
+      "id": "09-jieting-retreat",
+      "title": "街亭失利退回汉中",
+      "file": "09-街亭失利退回汉中.png",
+      "stage": "失利后撤军",
+      "nature": "历史题材概念演绎",
+      "caption": "街亭失利收兵，归汉中再整军。",
+      "width": 942,
+      "height": 1670,
+      "requestedAspectRatio": "452:801",
+      "exactAspectRatio": false,
+      "renderHint": {
+        "fit": "contain",
+        "blendMode": "multiply",
+        "transparent": false
+      }
+    }
+  ]
+}

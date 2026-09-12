@@ -1,0 +1,53 @@
+--- a/packages/serve/src/routes/topics.ts
++++ b/packages/serve/src/routes/topics.ts
+@@ -5,6 +5,7 @@
+  * 真实管线：mock provider 时全链路离线可跑（URL 分支仍受 safeFetch 门禁）。
+  */
+ import type { FastifyInstance } from 'fastify';
++import { createHash } from 'node:crypto';
+ import { z } from 'zod';
+ import { runPipeline } from '@sim/topic-pipeline';
+ import { ERROR_CODES } from '@sim/contracts';
+@@ -35,8 +36,8 @@
+       });
+     }
+     const input = parsed.data;
+-    // 轻量指纹做 topicId：URL 用原文，文本用内容前 16 字（同输入可复用/幂等）
+-    const topicId = input.kind === 'url' ? input.url : 'txt:' + input.text.slice(0, 16);
++    // 完整输入摘要，避免同前缀话题冲突；build 必须使用库内完整输入。
++    const topicId = 'topic-' + createHash('sha256').update(JSON.stringify(input)).digest('hex');
+     saveTopic(store, topicId, { status: 'idle', input: JSON.parse(JSON.stringify(input)) });
+     return reply.code(202).send({ topicId, state: 'idle' });
+   });
+@@ -48,14 +49,17 @@
+         .code(409)
+         .send({ error: { code: ERROR_CODES.TASK_RUNNING, message: '任务已运行' } });
+     }
++    const row = getTopic(store, id);
++    const savedInput = ingestSchema.safeParse(row ? JSON.parse(row.input) : null);
++    if (!savedInput.success) {
++      return reply.code(404).send({ error: { code: ERROR_CODES.TASK_NOT_FOUND, message: '请先登记完整议题' } });
++    }
+     runTask.add(id);
+     saveTopic(store, id, { status: 'running' });
+     reply.code(202).send({ accepted: true });
+ 
+     // 后台执行：阶段状态写库（status 各节点经 saveTopic），进度事件经 SSE 推送
+-    const input = id.startsWith('http')
+-      ? ({ kind: 'url', url: id } as const)
+-      : ({ kind: 'text', text: id.slice(4) } as const);
++    const input = savedInput.data;
+     void (async () => {
+       const factService = await facts; // 考据司检索库（PRESET 预置史实快照）
+       await runPipeline(input, {
+--- a/packages/serve/src/e2e.test.ts
++++ b/packages/serve/src/e2e.test.ts
+@@ -33,7 +33,7 @@
+   });
+   assert.equal(ingest.statusCode, 202);
+   const topicId = ingest.json().topicId;
+-  assert.equal(topicId, 'txt:' + TOPIC.slice(0, 16));
++  assert.match(topicId, /^topic-[a-f0-9]{64}$/);
+ 
+   // 2) build → 轮询到 ready（mock 管线全离线）
+   assert.equal(
