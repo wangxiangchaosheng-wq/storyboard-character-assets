@@ -81,8 +81,7 @@ function stripReasoning(text: string): string {
 function stripEchoedToolResult(text: string): string {
   return text
     .replace(/=+\s*工具调用结果\s*=+[\s\S]*?(?=\n\n|\n[^=\n]|\*$|$)/g, '')
-    .replace(/【调用局势】[\s\S]*?(?=\n\n|$)/g, '')
-    .replace(/-{2,}\s*【朝局态势】[\s\S]*?(?=\n\n|\n-{2,}|$)/g, '')
+    .replace(/【(?:调用局势|朝局实况|朝局态势)】[\s\S]*?(?=\n\n|$)/g, '')
     .trim();
 }
 
@@ -177,7 +176,12 @@ export async function runAgentLoop(
     cleaned = stripToolJson(cleaned);
     cleaned = stripEchoedToolResult(cleaned);
     // 纯工具JSON / 过短：本轮作废，继续要正文（不再回退到原始文本）
-    if (looksLikeRawToolJson(cleaned) || cleaned.replace(/\s/g, '').length < 6) {
+    // 纯工具意图宣言（如"容臣先观朝局实况，再定陈词"）→ 本轮作废，强制要正文
+    const noSpace = cleaned.replace(/\s/g, '');
+    const metaOnly =
+      noSpace.length < 40 &&
+      /先观|查看|查阅|观朝局|观实况|朝局实况|再定|再作|权衡利弊|斟酌言词/.test(noSpace);
+    if (looksLikeRawToolJson(cleaned) || noSpace.length < 6 || metaOnly) {
       finalText = '';
       continue;
     }
