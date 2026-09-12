@@ -56,6 +56,7 @@ function toast(msg, isErr) {
 
 /* ---------------- 全局状态 ---------------- */
 const S = { topicId: null, spec: null, gameId: null, busy: false };
+let lastBuildFailReason = ''; // 最近一次构建失败的服务端原因（SSE topics.spec.failed 携带）
 
 /* 页面阶段切换：home / building / spec / game */
 function phase(name) {
@@ -248,7 +249,14 @@ async function startBuild(topicId) {
     } catch (e) { /* 坏包忽略 */ }
   });
   source.addEventListener('topics.spec.ready', function () { setStage(4); finish(); });
-  source.addEventListener('topics.spec.failed', function () { finish(); });
+  source.addEventListener('topics.spec.failed', function (ev) {
+    try {
+      const p = JSON.parse(ev.data);
+      const rev = p.lastRevision || p.last_revision || [];
+      if (rev.length) lastBuildFailReason = String(rev[0]);
+    } catch (e) { /* 坏包忽略 */ }
+    finish();
+  });
 
   const poll = setInterval(async function () {
     if (settled) return;
@@ -266,19 +274,22 @@ async function startBuild(topicId) {
       }
     } catch (e) { /* 瞬时错误忽略 */ }
   }, 1200);
-  const hardStop = setTimeout(function () { if (!settled) finish(); }, 90_000);
+  const hardStop = setTimeout(function () { if (!settled) finish(); }, 480_000);
 
   await api(buildUrl, { method: 'POST' });
 }
 
 async function loadSpec() {
   try {
-    const r = await api('/api/topics/' + encodeURIComponent(S.topicId) + '/spec');
+    const r = await apiPost('/api/topics/spec', { id: S.topicId });
     S.spec = r.spec;
     renderSpec();
   } catch (e) {
     phase('home');
-    toast('剧本未能生成：' + e.message, true);
+    // 优先展示服务端记录的构建失败原因（如"知乎反爬，请粘贴文本"）
+    const reason = lastBuildFailReason || e.message;
+    lastBuildFailReason = '';
+    toast('剧本未能生成：' + reason, true);
   }
 }
 

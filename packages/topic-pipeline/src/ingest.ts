@@ -37,28 +37,79 @@ export async function ingestTopic(input: TopicInput): Promise<TopicBrief> {
     };
   }
   // URL 分支：safeFetch 校验后再抓（发请求前已拒绝私网/环回）
-  const res = await safeFetch(input.url, {
-    timeoutMs: 15_000,
-    // 知乎/百科等公开页面会拦裸 UA：带浏览器 UA 抓正文
-    headers: {
-      'user-agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
-    },
-  });
-  if (!res.ok) throw new AppError(ERROR_CODES.BAD_INPUT, `抓取失败 ${res.status}`);
-  const html = await res.text();
-  const clean = stripHtml(html).slice(0, 20_000);
-  if (!clean) throw new AppError(ERROR_CODES.BAD_INPUT, '页面无可提取正文');
+  const browserUA =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+
+  // 策略 1：直连抓正文（百科/新闻/博客等公开页面）
+  let body = '';
+  let lastStatus = 0;
+  try {
+    const res = await safeFetch(input.url, {
+      timeoutMs: 15_000,
+      headers: { 'user-agent': browserUA },
+    });
+    lastStatus = res.status;
+    if (res.ok) {
+      const html = await res.text();
+      const clean = stripHtml(html).slice(0, 20_000);
+      if (clean) body = clean;
+    }
+  } catch (e) {
+    // SSRF 门禁拒绝（私网/协议白名单）属于安全语义，必须立即上抛，不得回退
+    if (e instanceof AppError) throw e;
+    /* 其余网络错误 → 走回退 */
+  }
+
+  // 策略 2：知乎等反爬站点 → Bing 精确检索该问题（链接须含同一 question id，防模糊匹配串题）
+  if (!body) {
+    const viaSearch = await fetchViaBing(input.url, browserUA);
+    if (viaSearch) body = viaSearch;
+  }
+
+  if (!body) {
+    throw new AppError(
+      ERROR_CODES.BAD_INPUT,
+      `该站点拦截了服务端抓取（HTTP ${lastStatus || 'ERR'}）。请把话题标题/正文直接粘贴为文本开始，效果完全相同。`,
+    );
+  }
+
   return {
     id: `t_${Date.now().toString(36)}`,
-    title: clean.split('\n')[0]?.slice(0, 64) ?? input.url,
-    body: clean,
+    title: body.split('\n')[0]?.slice(0, 64) ?? input.url,
+    body,
     sections: [],
     asks: [],
     entities: [],
     sourceUrl: input.url,
     takenAt,
   };
+}
+
+/** Bing 精确检索回退：仅当结果链接包含同一 question id 时采用（防模糊匹配串题） */
+async function fetchViaBing(url: string, browserUA: string): Promise<string | null> {
+  const m = url.match(/question\/(\d+)/);
+  if (!m) return null;
+  const id = m[1];
+  try {
+    const res = await safeFetch(
+      'https://www.bing.com/search?q=' + encodeURIComponent(url) + '&setlang=zh-CN',
+      { timeoutMs: 12_000, headers: { 'user-agent': browserUA, 'accept-language': 'zh-CN,zh;q=0.9' } },
+    );
+    if (!res.ok) return null;
+    const html = await res.text();
+    const blockRe =
+      /<li class="b_algo"[\s\S]*?<h2[^>]*><a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/g;
+    for (const mm of html.matchAll(blockRe)) {
+      if (!mm[1].includes('/question/' + id)) continue;
+      const title = mm[2].replace(/<[^>]+>/g, '').trim();
+      const snippet = mm[3].replace(/<[^>]+>/g, '').trim();
+      if (!title) continue;
+      return `知乎问题：${title}\n${snippet}`;
+    }
+  } catch {
+    /* 检索失败 → 按无结果处理 */
+  }
+  return null;
 }
 
 // 本地文本指纹：内容相同 → 相同 topicId（去重）
