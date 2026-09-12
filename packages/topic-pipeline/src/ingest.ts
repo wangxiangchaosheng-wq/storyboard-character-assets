@@ -4,6 +4,7 @@
  */
 import { AppError, ERROR_CODES, type TopicBrief, type TopicInput } from '@sim/contracts';
 import { safeFetch } from '@sim/llm';
+import { readZhihuViaCli } from './zhihu.ts';
 
 function stripHtml(src: string): string {
   return src
@@ -39,25 +40,38 @@ export async function ingestTopic(input: TopicInput): Promise<TopicBrief> {
   // URL 分支：safeFetch 校验后再抓（发请求前已拒绝私网/环回）
   const browserUA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+  const isZhihu = /zhihu\.com\//.test(input.url);
+
+  // 策略 0：知乎链接 → 官方 zhihu-cli（Access Secret 由 CLI 自管；未装/未认证则静默跳过）
+  let body = '';
+  let title = '';
+  if (isZhihu) {
+    const viaCli = await readZhihuViaCli(input.url);
+    if (viaCli?.body) {
+      body = viaCli.body;
+      title = viaCli.title;
+    }
+  }
 
   // 策略 1：直连抓正文（百科/新闻/博客等公开页面）
-  let body = '';
   let lastStatus = 0;
-  try {
-    const res = await safeFetch(input.url, {
-      timeoutMs: 15_000,
-      headers: { 'user-agent': browserUA },
-    });
-    lastStatus = res.status;
-    if (res.ok) {
-      const html = await res.text();
-      const clean = stripHtml(html).slice(0, 20_000);
-      if (clean) body = clean;
+  if (!body) {
+    try {
+      const res = await safeFetch(input.url, {
+        timeoutMs: 15_000,
+        headers: { 'user-agent': browserUA },
+      });
+      lastStatus = res.status;
+      if (res.ok) {
+        const html = await res.text();
+        const clean = stripHtml(html).slice(0, 20_000);
+        if (clean) body = clean;
+      }
+    } catch (e) {
+      // SSRF 门禁拒绝（私网/协议白名单）属于安全语义，必须立即上抛，不得回退
+      if (e instanceof AppError) throw e;
+      /* 其余网络错误 → 走回退 */
     }
-  } catch (e) {
-    // SSRF 门禁拒绝（私网/协议白名单）属于安全语义，必须立即上抛，不得回退
-    if (e instanceof AppError) throw e;
-    /* 其余网络错误 → 走回退 */
   }
 
   // 策略 2：知乎等反爬站点 → Bing 精确检索该问题（链接须含同一 question id，防模糊匹配串题）
@@ -73,9 +87,10 @@ export async function ingestTopic(input: TopicInput): Promise<TopicBrief> {
     );
   }
 
+  const firstLine = (title || body.split('\n')[0] || input.url).trim();
   return {
     id: `t_${Date.now().toString(36)}`,
-    title: body.split('\n')[0]?.slice(0, 64) ?? input.url,
+    title: firstLine.slice(0, 64) || input.url,
     body,
     sections: [],
     asks: [],
