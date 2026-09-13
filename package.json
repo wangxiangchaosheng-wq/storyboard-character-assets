@@ -15,7 +15,9 @@
     "web": "pnpm --filter @sim/web dev",
     "assets:check": "pnpm --filter @sim/web assets:check",
     "topic": "node --experimental-strip-types packages/topic-pipeline/scripts/demo-topic.mts",
-    "topic:url": "node --experimental-strip-types packages/topic-pipeline/scripts/demo-topic.mts --url"
+    "topic:url": "node --experimental-strip-types packages/topic-pipeline/scripts/demo-topic.mts --url",
+    "zhihu:setup": "node --experimental-strip-types scripts/zhihu-setup.ts",
+    "zhihu:setup:install": "node --experimental-strip-types scripts/zhihu-setup.ts --install"
   },
   "packageManager": "pnpm@11.5.2"
 }
