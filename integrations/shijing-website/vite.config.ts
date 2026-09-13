@@ -1,7 +1,7 @@
 import { sites } from '@openai/sites-vite-plugin';
 import tailwindcss from '@tailwindcss/postcss';
 import vinext from 'vinext';
-import { defineConfig, loadEnv, type ProxyOptions } from 'vite';
+import { defineConfig, loadEnv, type ViteDevServer, type ProxyOptions } from 'vite';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -79,6 +79,16 @@ export default defineConfig(async () => {
     },
     plugins: [
       vinext(),
+      { name: 'world-write-boundary', configureServer(server: ViteDevServer) {
+        server.middlewares.use((req, res, next) => {
+          let path = ''; try { path = decodeURIComponent(new URL(req.url || '/', 'http://localhost').pathname).replace(/\/+/g, '/'); } catch { res.writeHead(400); res.end(); return; }
+          if (req.method === 'POST' && /^\/api\/agents\/runs\/[^/]+\/(world|world-events)\/?$/.test(path)) {
+            res.writeHead(403, {'Content-Type':'application/json; charset=utf-8'});
+            res.end(JSON.stringify({error:'世界写入仅供可信服务端调用，网页只能查询或运行独立演示。'})); return;
+          }
+          next();
+        });
+      } },
       ...hostedPlugins,
     ],
   };
