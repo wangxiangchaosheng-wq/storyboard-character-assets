@@ -1,0 +1,6 @@
+interface:
+  display_name: "重大故事事件资产"
+  short_description: "识别决策引发的重大故事结局，生成含左侧总结与事件时间的横向长图"
+  default_prompt: "使用 $major-story-event-assets，根据当前决策和后续对话识别已成立的重大结果，生成带左侧总结与时间的横向结局长图。"
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+interface:
+  display_name: "当前话题故事图"
+  short_description: "识别当前对话故事主题，直接生成一张完整场景图，无需分镜或预备资产"
+  default_prompt: "使用 $conversation-storyboard，根据当前对话正在讨论的故事或事件，直接生成一张完整场景图。"
+policy:
+  allow_implicit_invocation: true
