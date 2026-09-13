@@ -12,3 +12,5 @@ html,body,#viewport{background:#000;}#viewport{height:auto;min-height:100svh;ove
 /* All place names share the same building-to-text gap. */
 .city-marker svg{display:block;overflow:visible;}
 .place-label{top:calc(100% + 6px);left:50%;right:auto;transform:translateX(-50%);font-size:16px;line-height:20px;white-space:nowrap;}
+
+.map-pins{position:absolute;left:431.7px;top:192px;width:1160.7px;height:655.2px;overflow:hidden;pointer-events:none;z-index:3}.map-pins button{pointer-events:auto}#zoom-in,#zoom-out{z-index:5}#zoom-in:disabled,#zoom-out:disabled{cursor:default;opacity:.45}

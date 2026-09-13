@@ -1,6 +1,6 @@
 'use client';
 import {useState} from 'react';
-export default function CandleHome({onEvents}:{onEvents?:()=>void}={}) {
+export default function CandleHome({onEvents,onStrategy}:{onEvents?:()=>void;onStrategy?:()=>void}={}) {
   const [scrollOpen,setScrollOpen]=useState(false);
   return (
     <>
@@ -8,7 +8,7 @@ export default function CandleHome({onEvents}:{onEvents?:()=>void}={}) {
       <span className="candle-home-glow" aria-hidden="true" />
       <img className="candle-home-image" src="/art/candle-home-hover.png" width={2488} height={2488} alt="" draggable={false} />
     </a>
-    <a className="tiger-strategy" href="/?view=strategy" aria-label="点击虎符，返回开始页战略界面" title="战略地图">
+    <a className="tiger-strategy" href="/?view=strategy" onClick={e=>{if(onStrategy){e.preventDefault();onStrategy();}}} aria-label="打开战略地图卷轴" title="战略地图">
       <img src="/art/tiger-strategy-hover.png" alt="" draggable={false} />
     </a>
     <button type="button" className={'bamboo-scroll'+(scrollOpen?' is-open':'')} aria-label={scrollOpen?'收起竹简上的卷轴':'展开竹简上的卷轴'} aria-pressed={scrollOpen} title={scrollOpen?'收起卷轴':'展开卷轴'} onClick={()=>{if(onEvents)onEvents();else setScrollOpen(open=>!open);}}>

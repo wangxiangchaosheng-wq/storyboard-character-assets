@@ -1,5 +1,5 @@
 import {mkdirSync,readFileSync,writeFileSync,renameSync,existsSync} from 'node:fs';
-import {resolve} from 'node:path';
+import {resolve,basename} from 'node:path';
 import {createHash} from 'node:crypto';
 import sharp from 'sharp';
 import type {Job,Spec} from './contracts.js';
@@ -36,10 +36,13 @@ export function matchStory(job:Job){
 }
 export class StoryLibrary{
  constructor(readonly directory:string,readonly cache:string){mkdirSync(cache,{recursive:true});}
- key(job:Job){const c=storyContext(job);return createHash('sha256').update(JSON.stringify({version:1,text:c.text,stage:c.stage,world:c.world,cast:c.spec?.cast.map(({name,role,description,stance})=>({name,role,description,stance}))})).digest('hex');}
+ key(job:Job){const c=storyContext(job);return createHash('sha256').update(JSON.stringify({version:2,majorEvent:!!job.majorEvent,text:c.text,stage:c.stage,world:c.world,cast:c.spec?.cast.map(({name,role,description,stance})=>({name,role,description,stance}))})).digest('hex');}
  async find(job:Job){
-  const key=this.key(job),cached=resolve(this.cache,key+'.png'),meta=resolve(this.cache,key+'.json');
+  const key=this.key(job),library=resolve(this.directory,job.majorEvent?'重大事件':'自动生成'),record=resolve(library,key+'.json');
+  if(existsSync(record)){const info=JSON.parse(readFileSync(record,'utf8'));if(typeof info.file==='string'&&basename(info.file)===info.file&&existsSync(resolve(library,info.file)))return {png:readFileSync(resolve(library,info.file)),title:String(info.title),detail:'复用电脑素材库中的故事场景'};}
+  const cached=resolve(this.cache,key+'.png'),meta=resolve(this.cache,key+'.json');
   if(existsSync(cached)&&existsSync(meta)){const info=JSON.parse(readFileSync(meta,'utf8'));return {png:readFileSync(cached),title:info.title as string,detail:'复用已验收生成图（相同场景与人物设定）'};}
+  if(job.majorEvent)return;
   const entry=matchStory(job);if(!entry)return;
   const file=resolve(this.directory,entry.file);if(!existsSync(file))return;
   const png=readFileSync(file),m=await sharp(png).metadata();
@@ -48,6 +51,11 @@ export class StoryLibrary{
  }
  remember(job:Job,png:Buffer){
   const key=this.key(job),file=resolve(this.cache,key+'.png'),meta=resolve(this.cache,key+'.json');
+  const library=resolve(this.directory,job.majorEvent?'重大事件':'自动生成');mkdirSync(library,{recursive:true});
+  const title=job.plan?.summary||'故事板',name=title.replace(/[\/\\:*?"<>|\x00-\x1f]/g,'').slice(0,50)||'故事板';
+  const saved=name+'-'+key.slice(0,12)+'.png';
+  writeFileSync(resolve(library,saved)+'.tmp',png);renameSync(resolve(library,saved)+'.tmp',resolve(library,saved));
+  const record=resolve(library,key+'.json');writeFileSync(record+'.tmp',JSON.stringify({file:saved,title,context:storyContext(job),fromJob:job.id,createdAt:new Date().toISOString()},null,2));renameSync(record+'.tmp',record);
   writeFileSync(file+'.tmp',png);renameSync(file+'.tmp',file);
   writeFileSync(meta+'.tmp',JSON.stringify({title:job.plan?.summary||'故事板',context:storyContext(job),fromJob:job.id,createdAt:new Date().toISOString()}));renameSync(meta+'.tmp',meta);
  }

@@ -1,0 +1,96 @@
+{
+  "initializationId": "initial-world-001",
+  "snapshot": {
+    "schemaVersion": "world-state/v1",
+    "worldId": "REPLACE_RUN_ID",
+    "scenarioId": "REPLACE_SCENARIO_ID",
+    "mapId": "event-map-v1",
+    "revision": 0,
+    "clock": {
+      "startLabel": "建兴六年 · 公元228年 · 春",
+      "elapsedDays": 0
+    },
+    "factions": {
+      "shu": {
+        "id": "shu",
+        "name": "蜀",
+        "color": "#20573f"
+      },
+      "wei": {
+        "id": "wei",
+        "name": "魏",
+        "color": "#a54d39"
+      }
+    },
+    "cities": {
+      "hanzhong": {
+        "id": "hanzhong",
+        "name": "汉中",
+        "kind": "city",
+        "point": {
+          "x": 0.3191126279863481,
+          "y": 0.44561933534743203
+        },
+        "ownerFactionId": "shu",
+        "governor": null,
+        "foodKg": 30000,
+        "defense": 70
+      },
+      "changan": {
+        "id": "changan",
+        "name": "长安",
+        "kind": "city",
+        "point": {
+          "x": 0.4402730375426621,
+          "y": 0.2945619335347432
+        },
+        "ownerFactionId": "wei",
+        "governor": null,
+        "foodKg": 50000,
+        "defense": 80
+      }
+    },
+    "armies": {
+      "army-wei-yan": {
+        "id": "army-wei-yan",
+        "name": "魏延部",
+        "factionId": "shu",
+        "commander": {
+          "id": "wei-yan",
+          "name": "魏延"
+        },
+        "troops": 5000,
+        "foodKg": 5000,
+        "morale": 80,
+        "location": {
+          "kind": "city",
+          "cityId": "hanzhong"
+        },
+        "status": "stationed"
+      },
+      "army-changan": {
+        "id": "army-changan",
+        "name": "长安守军",
+        "factionId": "wei",
+        "commander": {
+          "id": "demo-defender",
+          "name": "守将（演示）"
+        },
+        "troops": 3000,
+        "foodKg": 2000,
+        "morale": 70,
+        "location": {
+          "kind": "city",
+          "cityId": "changan"
+        },
+        "status": "stationed"
+      }
+    },
+    "actions": {},
+    "decisions": {}
+  },
+  "basis": {
+    "kind": "mixed",
+    "note": "联调模板：数值为假设，请由研究 Agent 替换并注明来源"
+  }
+}
