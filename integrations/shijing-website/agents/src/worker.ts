@@ -19,7 +19,7 @@ export class Worker {
         try{const found=await this.library.find(persona);if(found){this.store.saveAsset(pending,found.png);pending.assetSource=found.entry.source==='provided'?'provided':'library';pending.error=undefined;pending.resumeDraft=false;this.store.step(pending,'succeeded','直接复用人物素材库：'+found.entry.name);}}
         catch(e){pending.error=(e as Error).message;this.store.step(pending,'failed',pending.error);}
       }}
-      if(this.stories){for(const pending of this.store.jobs().filter(j=>j.kind==='storyboard'&&!j.majorEvent&&!j.majorCandidate&&['queued','failed','interrupted'].includes(j.status))){
+      if(this.stories){for(const pending of this.store.jobs().filter(j=>j.kind==='storyboard'&&!j.majorCandidate&&['queued','failed','interrupted'].includes(j.status))){
         try{const found=await this.stories.find(pending);if(found){this.store.saveAsset(pending,found.png);pending.assetSource='library';pending.plan={prompt:'本地资产复用',summary:found.title,night:false,evidence:[found.detail]};pending.error=undefined;pending.resumeDraft=false;this.store.step(pending,'succeeded',found.detail);}}
         catch(e){pending.error=(e as Error).message;this.store.step(pending,'failed',pending.error);}
       }}
@@ -59,7 +59,7 @@ export class Worker {
           const png=await(this.provider.prepare?this.provider.prepare(job,draft,qa):prepare(draft,job.kind,job.majorEvent));
           const review=await this.provider.review(job,png);if(!review.pass)throw new AgentError(review.reason,422);
           this.store.saveAsset(job,png);job.assetSource='generated';job.error=undefined;job.resumeDraft=false;if(job.kind==='portrait'&&this.library){const persona=this.store.run(job.runId).spec.cast.find(p=>p.id===job.subjectId);if(persona)this.library.remember(persona,png,job);}
-          if(job.kind==='storyboard'&&!job.majorEvent&&this.stories){try{this.stories.remember(job,png);}catch{job.trace.push({at:new Date().toISOString(),step:'cache-warning',detail:'图片已保存，本次未写入复用库'});}}
+          if(job.kind==='storyboard'&&this.stories){try{this.stories.remember(job,png);}catch{job.trace.push({at:new Date().toISOString(),step:'cache-warning',detail:'图片已保存，本次未写入复用库'});}}
           this.store.step(job,'succeeded','图片通过原 Skill 检查并已保存');break;
         }catch(e){
           const error=e instanceof Error?e.message:'任务失败';job.feedback=error;job.error=error;

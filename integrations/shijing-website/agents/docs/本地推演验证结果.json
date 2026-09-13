@@ -1,0 +1,39 @@
+{
+  "checkedAt": "2026-09-12T19:23:24.026Z",
+  "runId": "b3c0cb76-7393-4e33-8632-fe16d860d64a",
+  "revision": 0,
+  "ready": true,
+  "localSimulation": true,
+  "army": {
+    "id": "army-wei-yan",
+    "name": "魏延部",
+    "faction": "蜀",
+    "color": "#20573f",
+    "commander": "魏延",
+    "troops": 5000,
+    "food": 60000,
+    "morale": 80,
+    "fatigue": 20,
+    "wounded": 0,
+    "dead": 0,
+    "transportPeople": 1000,
+    "position": {
+      "x": 840,
+      "y": 398
+    },
+    "mapPosition": {
+      "x": 810,
+      "y": 438
+    },
+    "location": "汉中",
+    "status": "驻扎"
+  },
+  "unchangedOriginalArrow": true,
+  "focusedTests": {
+    "passed": 31,
+    "failed": 0
+  },
+  "typecheck": "passed",
+  "webBuild": "passed",
+  "existingFullSuiteFailure": "library.test.mjs expects exactly 30 portraits; actual library contains 31"
+}

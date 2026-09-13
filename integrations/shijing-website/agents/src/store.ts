@@ -1,3 +1,4 @@
+import {WorldAgent} from './world-agent.js';
 import {DatabaseSync} from 'node:sqlite';
 import {randomUUID,createHash} from 'node:crypto';
 import {mkdirSync,writeFileSync,renameSync,existsSync} from 'node:fs';
@@ -24,7 +25,8 @@ export class Store {
   create(spec:Spec,cities:Record<string,string>={},engine?:{gameId:string;messages:Run['messages'];state:Record<string,number>;turn:number}):Run {
     const r:Run={id:randomUUID(),spec,world:initialWorld(spec,cities),mode:engine?'engine':'standalone',gameId:engine?.gameId,engineTurn:engine?.turn??0,messages:engine?.messages??[],createdAt:new Date().toISOString()};
     if(engine){for(const m of spec.metrics)assert(Number.isFinite(engine.state[m.key])&&engine.state[m.key]>=m.min&&engine.state[m.key]<=m.max,'引擎初始状态无效');r.world.metrics={...engine.state};}
-    this.transaction(()=>{this.saveRun(r);for(const p of spec.cast)this.enqueue(r.id,'portrait',p.id,{persona:p,spec});this.enqueue(r.id,'storyboard','opening',{spec,stage:'开场设定；方案仍是设想，不得画成已经胜利',world:r.world});});return r;
+    const worlds=new WorldAgent(this);
+    this.transaction(()=>{this.saveRun(r);worlds.bootstrapRunInTransaction(r);for(const p of spec.cast)this.enqueue(r.id,'portrait',p.id,{persona:p,spec});this.enqueue(r.id,'storyboard','opening',{spec,stage:'开场设定；方案仍是设想，不得画成已经胜利',world:this.run(r.id).world});});return this.run(r.id);
   }
   enqueue(runId:string,kind:Job['kind'],subjectId:string,input:unknown):Job {
     const dedupe=hash([runId,kind,subjectId,input]); const existing=this.db.prepare('SELECT payload FROM jobs WHERE dedupe=?').get(dedupe);if(existing)return JSON.parse(String(existing.payload));
@@ -45,6 +47,7 @@ export class Store {
   apply(runId:string,event:Settlement):Run {return this.transaction(()=>{
     const r=this.run(runId); const old=this.db.prepare('SELECT digest FROM events WHERE run_id=? AND event_id=?').get(runId,event.id);
     if(old){assert(old.digest===hash(event),'相同事件编号对应不同内容',409);return r;}
+    assert(!this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='world_states'").get()||!this.db.prepare('SELECT 1 FROM world_states WHERE run_id=?').get(runId),'此局已接入世界状态 Agent，请改用 world-events 结构化结算接口',409);
     const before=r.world;r.world=settle(before,event,r.spec);
     this.db.prepare('INSERT INTO events VALUES(?,?,?,?)').run(runId,event.id,hash(event),JSON.stringify({event,before,after:r.world}));
     this.saveRun(r);if(event.significant)this.enqueue(runId,'storyboard',event.id,{spec:r.spec,event,world:r.world,majorEvent:true});return r;

@@ -1,0 +1,257 @@
+{
+  "id": "hanzhong-local-v1",
+  "version": 1,
+  "status": "experimental",
+  "sources": [
+    {
+      "url": "https://ctext.org/text.pl?if=gb&node=603669&remap=gb",
+      "note": "魏延传裴注：子午谷方案是提案，十日不是实测行军速度；负粮五千不作为公斤数。"
+    },
+    {
+      "url": "https://ctext.org/text.pl?if=gb&node=602731&show=parallel",
+      "note": "张郃传：取水通道影响战局；未提供本模型的伤亡或口粮系数。"
+    }
+  ],
+  "parameters": {
+    "marchKmDay": {
+      "value": 20,
+      "min": 15,
+      "max": 25,
+      "unit": "km/day",
+      "sourceKind": "simulation",
+      "note": "审核稿基础速度；道路与负重另计"
+    },
+    "forcedFactor": {
+      "value": 1.3,
+      "min": 1.15,
+      "max": 1.4,
+      "unit": "倍",
+      "sourceKind": "simulation",
+      "note": "审核稿急行军倍率"
+    },
+    "fatigueSpeed": {
+      "value": 0.005,
+      "min": 0.003,
+      "max": 0.007,
+      "unit": "每疲劳点",
+      "sourceKind": "simulation",
+      "note": "审核稿疲劳速度折减"
+    },
+    "fatigueMarch": {
+      "value": 8,
+      "min": 6,
+      "max": 10,
+      "unit": "点/day",
+      "sourceKind": "simulation",
+      "note": "审核稿普通行军疲劳"
+    },
+    "fatigueForced": {
+      "value": 18,
+      "min": 15,
+      "max": 22,
+      "unit": "点/day",
+      "sourceKind": "simulation",
+      "note": "审核稿急行军疲劳"
+    },
+    "fatigueRest": {
+      "value": 15,
+      "min": 10,
+      "max": 18,
+      "unit": "点/day",
+      "sourceKind": "simulation",
+      "note": "审核稿充分补给休整恢复"
+    },
+    "forcedLimit": {
+      "value": 70,
+      "min": 60,
+      "max": 80,
+      "unit": "点",
+      "sourceKind": "simulation",
+      "note": "审核稿急行军上限"
+    },
+    "rationKg": {
+      "value": 1,
+      "min": 0.8,
+      "max": 1.2,
+      "unit": "kg/person/day",
+      "sourceKind": "simulation",
+      "note": "粮食当量；非史料定额"
+    },
+    "waterLitres": {
+      "value": 4,
+      "min": 3,
+      "max": 6,
+      "unit": "L/person/day",
+      "sourceKind": "simulation",
+      "note": "供水游戏抽象，非医学或历史定额"
+    },
+    "foodMorale": {
+      "value": 8,
+      "min": 4,
+      "max": 12,
+      "unit": "点/day",
+      "sourceKind": "simulation",
+      "note": "完全断粮时的模拟士气下降"
+    },
+    "waterMorale": {
+      "value": 16,
+      "min": 8,
+      "max": 24,
+      "unit": "点/day",
+      "sourceKind": "simulation",
+      "note": "完全缺水时的模拟士气下降"
+    },
+    "hungerDesertion": {
+      "value": 0.01,
+      "min": 0.005,
+      "max": 0.02,
+      "unit": "比例/day",
+      "sourceKind": "simulation",
+      "note": "持续断粮48小时后的模拟逃散率"
+    },
+    "hungerThresholdHours": {
+      "value": 48,
+      "min": 24,
+      "max": 72,
+      "unit": "hour",
+      "sourceKind": "simulation",
+      "note": "断粮后进一步影响人员的阈值"
+    },
+    "lossRate": {
+      "value": 0.04,
+      "min": 0.02,
+      "max": 0.06,
+      "unit": "比例/day",
+      "sourceKind": "simulation",
+      "note": "接战期间丧失战力率；待独立案例校准"
+    },
+    "combatRatioMin": {
+      "value": 0.5,
+      "min": 0.25,
+      "max": 0.75,
+      "unit": "倍",
+      "sourceKind": "simulation",
+      "note": "审核稿战力比损失下限"
+    },
+    "combatRatioMax": {
+      "value": 2,
+      "min": 1.5,
+      "max": 3,
+      "unit": "倍",
+      "sourceKind": "simulation",
+      "note": "审核稿战力比损失上限"
+    },
+    "woundedShare": {
+      "value": 0.6,
+      "min": 0.4,
+      "max": 0.8,
+      "unit": "比例",
+      "sourceKind": "simulation",
+      "note": "战斗损失中伤员比例；待校准"
+    },
+    "recoveryRate": {
+      "value": 0.05,
+      "min": 0.02,
+      "max": 0.08,
+      "unit": "比例/day",
+      "sourceKind": "simulation",
+      "note": "安全且补给充分时的伤员恢复率"
+    },
+    "frontage": {
+      "value": 2500,
+      "min": 1000,
+      "max": 5000,
+      "unit": "人/方",
+      "sourceKind": "simulation",
+      "note": "单路接战容量的抽象参数"
+    },
+    "combatFatigue": {
+      "value": 24,
+      "min": 16,
+      "max": 32,
+      "unit": "点/day",
+      "sourceKind": "simulation",
+      "note": "持续接战疲劳"
+    },
+    "retreatMorale": {
+      "value": 25,
+      "min": 20,
+      "max": 35,
+      "unit": "点",
+      "sourceKind": "simulation",
+      "note": "本地守军紧急退出判断"
+    },
+    "assaultDefender": {
+      "value": 1.5,
+      "min": 1.2,
+      "max": 2,
+      "unit": "倍",
+      "sourceKind": "simulation",
+      "note": "完整城防对守军有效战力的最大修正"
+    },
+    "blockadeNeed": {
+      "value": 1.5,
+      "min": 1,
+      "max": 2,
+      "unit": "倍",
+      "sourceKind": "simulation",
+      "note": "完全封锁所需围城可战兵力与守军之比；简化"
+    },
+    "siegeDamage": {
+      "value": 2,
+      "min": 1,
+      "max": 3,
+      "unit": "城防点/day",
+      "sourceKind": "simulation",
+      "note": "每单位攻城能力对城防的持续损伤"
+    },
+    "pursuitFactor": {
+      "value": 0.5,
+      "min": 0.25,
+      "max": 0.75,
+      "unit": "倍",
+      "sourceKind": "simulation",
+      "note": "接触中撤退的追击损失系数"
+    },
+    "carrierKg": {
+      "value": 40,
+      "min": 30,
+      "max": 50,
+      "unit": "kg/person",
+      "sourceKind": "simulation",
+      "note": "独立运输人员装载能力；不含个人装备"
+    },
+    "shipmentLoss": {
+      "value": 0.002,
+      "min": 0,
+      "max": 0.005,
+      "unit": "比例/day",
+      "sourceKind": "simulation",
+      "note": "运输货物损耗"
+    },
+    "navigationMax": {
+      "value": 1.05,
+      "min": 1,
+      "max": 1.1,
+      "unit": "倍",
+      "sourceKind": "simulation",
+      "note": "已登记熟悉道路的最大导航加成"
+    },
+    "intelHours": {
+      "value": 24,
+      "min": 12,
+      "max": 48,
+      "unit": "hour",
+      "sourceKind": "simulation",
+      "note": "过期情报不用于新的进攻决策"
+    },
+    "minimumOrderHours": {
+      "value": 6,
+      "min": 3,
+      "max": 12,
+      "unit": "hour",
+      "sourceKind": "simulation",
+      "note": "普通本地决策保持时间，紧急事件可打断"
+    }
+  }
+}
