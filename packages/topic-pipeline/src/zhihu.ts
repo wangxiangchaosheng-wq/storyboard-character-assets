@@ -48,6 +48,9 @@ export function findZhihuCli(): string | null {
     process.platform === 'win32'
       ? [join(process.env.LOCALAPPDATA ?? '', 'ZhihuCLI', 'current', 'zhihu-cli.exe')]
       : [
+          ...(process.platform === 'darwin'
+            ? [join(homedir(), 'Library', 'Application Support', 'zhihu-cli', 'current', 'zhihu-cli')]
+            : []),
           join(homedir(), '.local', 'share', 'zhihu-cli', 'current', 'zhihu-cli'),
           join(homedir(), '.zhihu-cli', 'current', 'zhihu-cli'),
         ];

@@ -36,3 +36,9 @@ _refs/
 # Mimosa 扫描状态（ZCode hook 内部状态，不入库）
 .mimosa/
 
+
+# 史境网页本地缓存与推演存档
+integrations/shijing-website/.agent-data/
+integrations/shijing-website/.next/
+integrations/shijing-website/.vinext/
+integrations/shijing-website/agents/tests/.runtime/

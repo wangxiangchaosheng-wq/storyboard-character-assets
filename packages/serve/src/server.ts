@@ -13,6 +13,7 @@ import { openStore } from './store.ts';
 import { SseHub } from './sse.ts';
 import { registerTopicRoutes } from './routes/topics.ts';
 import { registerGameRoutes } from './routes/games.ts';
+import { registerLocalWorldRoutes } from './routes/local-world.ts';
 import { registerWebRoutes } from './web.ts';
 
 export interface AppBuildOptions {
@@ -43,6 +44,7 @@ export function buildServer(opts: AppBuildOptions = {}) {
 
   registerTopicRoutes(app, { providers, hub, store, facts: factStore });
   registerGameRoutes(app, { providers, hub, store });
+  registerLocalWorldRoutes(app, providers);
   registerWebRoutes(app);
 
   // 统一错误形状：AppError → { error: { code, message } }（5000 兜底）

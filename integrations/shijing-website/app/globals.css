@@ -43,7 +43,9 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--cinnabar
 .message-portrait { flex: 0 0 60px; width: 60px; height: 79px; object-fit: contain; object-position: center bottom; }
 .message-content { min-width: 0; flex: 1; }
 .message-content b { display: block; font-size: 20px; font-weight: 600; margin: 0 0 1px 10px; line-height: 25px; }
-.message-content p { min-height: 70px; margin: 0; padding: 10px 14px 9px 26px; font-size: 17px; line-height: 1.45; background: url('/art/speech-bubble.webp') center / 100% 100% no-repeat; overflow-wrap: anywhere; }
+.message-content p { position: relative; isolation: isolate; min-height: 70px; margin: 0; padding: 10px 14px 9px 26px; font-size: 17px; line-height: 1.45; overflow-wrap: anywhere; }
+/* Keep the original corners and speech pointer fixed; extend only the straight edges. */
+.message-content p::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-style: solid; border-width: 24px 12px 12px 14px; border-image: url('/art/speech-bubble.webp') 45 24 24 28 fill / 24px 12px 12px 14px / 0 stretch; }
 .user-mark { flex: 0 0 60px; height: 60px; display: grid; place-items: center; color: #785333; font-size: 25px; }
 .message.user .message-content b { color: var(--cinnabar); }
 .message.user .message-content p { background-color: #b8986115; border-radius: 10px; }

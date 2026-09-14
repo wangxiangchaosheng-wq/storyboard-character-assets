@@ -1,0 +1,24 @@
+{
+  "file": "已验收图-be02558b33a3.png",
+  "title": "已验收图",
+  "context": {
+    "text": "一座新营地的议事 魏延提议研究可行性",
+    "spec": {
+      "id": "test",
+      "title": "一座新营地的议事",
+      "scenario": {
+        "background": "魏延提议研究可行性"
+      },
+      "cast": [
+        {
+          "id": "a",
+          "name": "魏延",
+          "role": "将领",
+          "description": "蜀汉将领"
+        }
+      ],
+      "metrics": []
+    }
+  },
+  "createdAt": "2026-09-14T04:11:42.795Z"
+}

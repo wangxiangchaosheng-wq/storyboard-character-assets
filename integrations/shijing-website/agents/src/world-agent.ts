@@ -191,6 +191,10 @@ export class WorldAgent implements WorldStateService {
       revision:w.revision,fromDay:before.clock.elapsedDays,toDay:w.clock.elapsedDays,source:'rules',title:kind==='order'?'命令已登记':report.pauseReason||'本地推演',summary:report.summaries.join('\n'),related:[...related.values()],changes,simulationReport:report};
     this.store.db.prepare('INSERT INTO world_events VALUES(?,?,?,?,?)').run(runId,event.id,w.revision,fingerprint,JSON.stringify(event));
     this.store.db.prepare('UPDATE world_states SET payload=? WHERE run_id=?').run(JSON.stringify(w),runId);this.mirror(runId,w);
+    if(process.env.AGENT_ALLOW_API_GENERATION==='true'){
+      const run=this.store.run(runId);
+      this.store.enqueue(runId,'storyboard','world-'+event.id,{spec:run.spec,event:{id:event.id,confirmed:true,summary:event.summary},world:run.world,worldTime:w.clock,changes:event.changes,majorCandidate:true,recent_messages:run.messages.slice(-12)});
+    }
     return{ok:true,alreadyApplied:false,eventId:event.id,appliedRevision:w.revision,currentRevision:w.revision};
   }
   localMessage(runId:string,raw:unknown){

@@ -38,6 +38,7 @@ export interface SpecWithMeta {
 }
 
 export interface GenerateOpts {
+  researchOnly?: boolean;
   /** 考据司的检索/估算设施（mock 离线时也可只给 search），缺省 = 不检索 */
   facts?: FactCollectOpts;
   /** 已完成的考据结果（pipeline 复用；缺省 = 本函数内部再考据一次） */
@@ -85,7 +86,7 @@ export async function generateSpec(
   const domain = pickDomain(theme + (drama?.conflict ?? ''), cast);
 
   // ④ 数值司：动态推导（LLM 或离线线索），不套预设数值
-  const nums = await deriveNumbers(brief, fill, drama, chat, domain);
+  const nums = opts.researchOnly ? {metrics: [], rules: [], provenance: [], derivations: []} : await deriveNumbers(brief, fill, drama, chat, domain);
 
   // 组装 spec：场景/人物来自构演司；数值/规则来自数值司；溯源随 spec 落库
   const scenarioTitle = `话题推演：${brief.title.slice(0, 24)}`;
@@ -97,14 +98,14 @@ export async function generateSpec(
       background: drama?.background ?? `时局围绕「${label}」展开。各方立场悬殊，需你统筹。`,
       conflict: drama?.conflict ?? `${label}：支持者主张当断则断，反对者强调稳字当头。`,
       participants: cast.map((c) => c.id),
-      rounds: drama?.rounds ?? 3,
+      rounds: opts.researchOnly ? Math.max(2, Math.min(6, drama?.rounds ?? 3)) : drama?.rounds ?? 3,
       decisionPoint: drama?.decisionPoint ?? '作为统筹者，你最终下达怎样的决断？',
       successCriteria: drama?.successCriteria ?? '让局面在各方博弈中走向可接受的平衡。',
     },
     cast,
     metrics: nums.metrics,
     rules: nums.rules,
-    rounds: drama?.rounds ?? 3,
+    rounds: opts.researchOnly ? Math.max(2, Math.min(6, drama?.rounds ?? 3)) : drama?.rounds ?? 3,
     seedEvents: drama?.seedEvents,
     provenance: nums.provenance,
     derivations: nums.derivations,
@@ -112,7 +113,7 @@ export async function generateSpec(
 
   // ④ 审校司·公式复核：LLM 有裁定时采纳其结论，否则确定性规则引擎兜底；
   //    审计记录随 spec 落库，公式原文不对外下发（只出 ok/issues/source）
-  const formulaAudit = await auditFormulaSet(nums.metrics, nums.rules, chat);
+  const formulaAudit = opts.researchOnly ? [] : await auditFormulaSet(nums.metrics, nums.rules, chat);
   const bad = formulaAudit.filter((a) => !a.ok);
   if (bad.length > 0) {
     // 公式不合理 → 拒收这版数值（上游 try/catch 转 failed 并带复核意见）

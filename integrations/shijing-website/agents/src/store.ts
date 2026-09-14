@@ -22,11 +22,11 @@ export class Store {
   run(id:string):Run {const r=this.db.prepare('SELECT payload FROM runs WHERE id=?').get(id);assert(r,'对局不存在',404);return JSON.parse(String(r.payload));}
   runs():Run[]{return this.db.prepare('SELECT payload FROM runs ORDER BY rowid DESC LIMIT 30').all().map(r=>JSON.parse(String(r.payload)));}
   saveRun(r:Run){this.db.prepare('INSERT OR REPLACE INTO runs VALUES(?,?)').run(r.id,JSON.stringify(r));}
-  create(spec:Spec,cities:Record<string,string>={},engine?:{gameId:string;messages:Run['messages'];state:Record<string,number>;turn:number}):Run {
+  create(spec:Spec,cities:Record<string,string>={},engine?:{gameId:string;messages:Run['messages'];state:Record<string,number>;turn:number},onCreated?:(run:Run)=>void):Run {
     const r:Run={id:randomUUID(),spec,world:initialWorld(spec,cities),mode:engine?'engine':'standalone',gameId:engine?.gameId,engineTurn:engine?.turn??0,messages:engine?.messages??[],createdAt:new Date().toISOString()};
     if(engine){for(const m of spec.metrics)assert(Number.isFinite(engine.state[m.key])&&engine.state[m.key]>=m.min&&engine.state[m.key]<=m.max,'引擎初始状态无效');r.world.metrics={...engine.state};}
     const worlds=new WorldAgent(this);
-    this.transaction(()=>{this.saveRun(r);worlds.bootstrapRunInTransaction(r);for(const p of spec.cast)this.enqueue(r.id,'portrait',p.id,{persona:p,spec});this.enqueue(r.id,'storyboard','opening',{spec,stage:'开场设定；方案仍是设想，不得画成已经胜利',world:this.run(r.id).world});});return this.run(r.id);
+    this.transaction(()=>{this.saveRun(r);worlds.bootstrapRunInTransaction(r);for(const p of spec.cast)this.enqueue(r.id,'portrait',p.id,{persona:p,spec});this.enqueue(r.id,'storyboard','opening',{spec,stage:'开场设定；方案仍是设想，不得画成已经胜利',world:this.run(r.id).world});onCreated?.(this.run(r.id));});return this.run(r.id);
   }
   enqueue(runId:string,kind:Job['kind'],subjectId:string,input:unknown):Job {
     const dedupe=hash([runId,kind,subjectId,input]); const existing=this.db.prepare('SELECT payload FROM jobs WHERE dedupe=?').get(dedupe);if(existing)return JSON.parse(String(existing.payload));

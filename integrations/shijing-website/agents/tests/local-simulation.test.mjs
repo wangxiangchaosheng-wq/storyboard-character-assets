@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,rmSync,mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {Store} from '../dist/store.js';
 import {WorldAgent} from '../dist/world-agent.js';
@@ -11,7 +11,7 @@ import {foodTotal,peopleTotal} from '../dist/simulation-state.js';
 import {parseLocalCommand} from '../dist/simulation-commands.js';
 import {makeServer} from '../dist/server.js';
 const spec={id:'northern-test',title:'诸葛亮北伐：子午谷奇谋',scenario:{background:'公元228年春。汉中向长安进军。'},cast:[{id:'wei-yan',name:'魏延',role:'蜀汉将领',description:'测试'}],metrics:[]};
-function setup(t){const dir=mkdtempSync(fileURLToPath(new URL('./.runtime/run-',import.meta.url)));const store=new Store(dir),agent=new WorldAgent(store),run=store.create(spec);t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true});});return{store,agent,id:run.id,dir};}
+function setup(t){mkdirSync(fileURLToPath(new URL("./.runtime/",import.meta.url)),{recursive:true});const dir=mkdtempSync(fileURLToPath(new URL('./.runtime/run-',import.meta.url)));const store=new Store(dir),agent=new WorldAgent(store),run=store.create(spec);t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true});});return{store,agent,id:run.id,dir};}
 function fixture(){return buildInitialWorld({id:'fixture',spec,mode:'standalone',world:{version:0,day:0,metrics:{},cities:{}},engineTurn:0}).snapshot;}
 const order=(w,kind='march',extra={})=>({commandId:'order-'+w.revision,expectedRevision:w.revision,armyId:'army-wei-yan',kind,...(kind==='garrison'?{}:{targetCityId:'changan'}),...extra});
 const advance=(w,hours=24)=>({commandId:'advance-'+w.revision,expectedRevision:w.revision,hours});

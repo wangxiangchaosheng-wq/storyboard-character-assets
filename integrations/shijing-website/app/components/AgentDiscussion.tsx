@@ -17,6 +17,7 @@ export default function AgentDiscussion(){
   const [strategyOpen,setStrategyOpen]=useState(false);
   useEffect(()=>{if(new URLSearchParams(location.search).get('strategy')==='1')setStrategyOpen(true);},[]);
   const [eventsOpen,setEventsOpen]=useState(false);
+  const [displayStory,setDisplayStory]=useState<Job>();
   const [view,setView]=useState<View|null>(null),[error,setError]=useState(''),[status,setStatus]=useState('正在读取议题…'),[selected,setSelected]=useState(''),[text,setText]=useState(''),[act,setAct]=useState(false),[sending,setSending]=useState(false),[scale,setScale]=useState(1),[showWorld,setShowWorld]=useState(false);
   const viewport=useRef<HTMLDivElement>(null);const runId=useRef('');const boot=useRef<Promise<string>|null>(null);const log=useRef<HTMLDivElement>(null);
   useEffect(()=>{let alive=true;let timer:ReturnType<typeof setTimeout>;
@@ -30,13 +31,13 @@ export default function AgentDiscussion(){
       }
       const health=await api<{configured:boolean;engineConfigured:boolean;generationEnabled:boolean}>('health');
       const topic=query.get('topic')?parseTopic(JSON.parse(query.get('topic')!)):defaultTopic;
-      const key='shijing-agent-run-v2:'+JSON.stringify(topic);let previous='';try{previous=localStorage.getItem(key)||'';}catch{}
+      const key=(health.engineConfigured?'shijing-research-run-v1:':'shijing-agent-run-v2:')+JSON.stringify(topic);let previous='';try{previous=localStorage.getItem(key)||'';}catch{}
       if(previous){try{await api('runs/'+previous);return previous;}catch{}}
       
       if(health.generationEnabled!==false&&!health.engineConfigured&&!health.configured)throw new Error('请先在本机配置 OpenAI API Key，再重新进入此议题。');
       setStatus('正在确定本次议题的人物名单…');let next:View;
-      if(health.generationEnabled===false)next=await api<View>('runs',{reuseKey:key,spec:localTopicSpec(topic)});
-      else if(health.engineConfigured)next=await api<View>('runs',{reuseKey:key,topic:`${topic.title}\n${topic.description}\n公元${topic.year}年${topic.season}`,player:'主上'});
+      if(health.engineConfigured)next=await api<View>('runs',{reuseKey:key,researchTopic:topic});
+      else if(health.generationEnabled===false)next=await api<View>('runs',{reuseKey:key,spec:localTopicSpec(topic)});
       else{
         // Standalone art mode reuses the existing director once; every subsequent asset uses the saved cast IDs.
         const res=await fetch('/api/agents/topic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic}),signal:AbortSignal.timeout(260000)});const plan=await res.json() as TopicPlan&{error?:string};if(!res.ok)throw new Error(plan.error||'人物设定生成失败');
@@ -45,24 +46,32 @@ export default function AgentDiscussion(){
       }
       try{localStorage.setItem(key,next.id);}catch{}return next.id;
     }
-    async function refresh(){try{const data=await api<View>('runs/'+runId.current);if(alive){setView(data);setSelected(old=>old&&data.spec.cast.some(p=>p.id===old)?old:data.spec.cast[0].id);setStatus('');setError('');}}catch(e){if(alive)setError((e as Error).message);}finally{if(alive)timer=setTimeout(refresh,2500);}}
+    async function refresh(){try{const data=await api<View>('runs/'+runId.current);if(alive){setView(data);setSelected(old=>old&&data.spec.cast.some(p=>p.id===old)?old:data.spec.cast[0].id);setStatus('');}}catch(e){if(alive)setError((e as Error).message);}finally{if(alive)timer=setTimeout(refresh,2500);}}
     boot.current??=start();void boot.current.then(id=>{if(!alive)return;runId.current=id;void api('runs/'+id+'/prepare',{}).catch(e=>{if(alive)setError(e.message);});const url=new URL(location.href);url.searchParams.set('run',id);history.replaceState(null,'',url);void refresh();}).catch(e=>{if(alive){setError(e.name==='TimeoutError'?'读取议题或人物名单超时，请重新连接后再试。':e.message);setStatus('');}});
     return()=>{alive=false;clearTimeout(timer);};
   },[]);
   useEffect(()=>{const node=viewport.current;if(!node)return;const observer=new ResizeObserver(([entry])=>setScale(entry.contentRect.width/1672));observer.observe(node);return()=>observer.disconnect();},[]);
   useEffect(()=>{log.current?.scrollTo({top:log.current.scrollHeight,behavior:'smooth'});},[view?.messages.length]);
-  async function submit(){if(!view||!text.trim()||sending)return;setSending(true);setError('');const message=text;setText('');try{setView(await api<View>(`runs/${view.id}/messages`,{commandId:crypto.randomUUID(),text:message,to:selected,act}));}catch(e){setError((e as Error).message+'。请先同步状态后再决定是否重新发送。');}finally{setSending(false);}}
+  async function submit(){if(!view||!text.trim()||sending)return;if(act&&/^(下达行动|执行|开始)[。！!]*$/.test(text.trim())){setError('请写明行动内容，例如：魏延 行军 长安，然后点击发送。若想和人物对话，请取消勾选下达行动。');return;}setSending(true);setError('');const message=text;setText('');try{setView(await api<View>(`runs/${view.id}/messages`,{commandId:crypto.randomUUID(),text:message,to:selected,act}));}catch(e){setText(message);setError((e as Error).message+'。输入已保留；如请求超时，请先核对对话和地图记录，避免重复下令。');}finally{setSending(false);}}
   async function sync(){if(!view)return;try{setView(await api<View>(`runs/${view.id}/sync`,{}));setError('');}catch(e){setError((e as Error).message);}}
   async function retry(job:Job){try{await api(`jobs/${job.id}/retry`,{});setView(await api<View>('runs/'+job.runId));setError('');}catch(e){setError((e as Error).message);}}
   const people=view?.spec.cast??[];const selectedIndex=Math.max(0,people.findIndex(p=>p.id===selected));const group=Math.floor(selectedIndex/5);const visible=people.slice(group*5,group*5+5);
   const latest=(kind:Job['kind'],subject?:string)=>view?.jobs.filter(j=>j.kind===kind&&(!subject||j.subjectId===subject)&&j.status==='succeeded').at(-1);
-  const storyTask=view?.jobs.filter(j=>j.kind==='storyboard'&&!j.majorEvent&&!j.majorCandidate).at(-1);const story=storyTask?.status==='succeeded'?storyTask:undefined;const storyProgress=view?.generationEnabled===false?'暂无匹配当前话题与阶段的故事板，在线生成已关闭。':storyTask?({queued:'等待人物任务完成后绘制',planning:'正在准备故事画面',generating:'正在绘制故事图，请耐心等待',checking:'正在检查故事画面与文字',failed:'故事图生成未完成，可展开左下角查看原因',interrupted:'任务已中断，可展开左下角重试',succeeded:'故事图已保存'}[storyTask.status]):'等待完成配置与议题准备';const assetUrl=(j?:Job)=>j?.asset?'/api/agents/assets/'+j.asset:'';
+  const storyTask=view?.jobs.filter(j=>j.kind==='storyboard'&&!j.majorEvent&&!j.majorCandidate).at(-1);const story=displayStory?.runId===view?.id?displayStory:undefined;const storyProgress=view?.generationEnabled===false?'暂无匹配当前话题与阶段的故事板，在线生成已关闭。':storyTask?({queued:'等待人物任务完成后绘制',planning:'正在准备故事画面',generating:'正在绘制故事图，请耐心等待',checking:'正在检查故事画面与文字',failed:'故事图生成未完成，可展开左下角查看原因',interrupted:'任务已中断，可展开左下角重试',succeeded:'故事图已保存'}[storyTask.status]):'等待完成配置与议题准备';const assetUrl=(j?:Job)=>j?.asset?'/api/agents/assets/'+j.asset:'';
+  const readyStory=view?.jobs.filter(j=>j.kind==='storyboard'&&!j.majorEvent&&!j.majorCandidate&&j.status==='succeeded'&&j.asset).at(-1);
+  useEffect(()=>{
+    if(!readyStory?.asset)return;
+    let live=true;const image=new Image();
+    image.onload=()=>{void image.decode().then(()=>{if(live)setDisplayStory(readyStory);}).catch(()=>{/* Keep the previous scene if the new image cannot be decoded. */});};
+    image.src='/api/agents/assets/'+readyStory.asset;
+    return()=>{live=false;image.onload=null;};
+  },[readyStory?.id,readyStory?.asset]);
   const assets:SceneAssets={characters:slotIds.map((slot,i)=>{const p=visible[i];const url=p?assetUrl(latest('portrait',p.id)):'';return{id:slot,name:p?.name||'—',role:p?.role||'',card:url,avatar:url,hero:url};}),storyboard:{image:assetUrl(story),sceneKey:story?.subjectId||'',title:story?.plan?.summary||'',caption:story?.plan?.summary||'',location:''}};
   const activeSlot=slotIds[selectedIndex%5];const done=view?.jobs.filter(j=>j.status==='succeeded').length??0;const failed=view?.jobs.filter(j=>['failed','interrupted'].includes(j.status))??[];
   return <main className="scene-viewport discussion-fullwidth" ref={viewport}>
     {view&&strategyOpen&&<StrategyScreen data={view.strategy||{armies:[],cities:[],actions:[],decisions:[],changes:[],worldTime:{elapsedDays:view.world.day},ready:false}} onClose={()=>setStrategyOpen(false)}/>}
     {view&&<MajorEventScreen runId={view.id} jobs={view.jobs} onRetry={retry} open={eventsOpen} onClose={()=>setEventsOpen(false)}/>}
-    <PreparationScreen loadingStatus={status} people={people} jobs={view?.jobs??[]} paused={view?.generationEnabled===false} error={error} onRetry={retry}/>
+    <PreparationScreen key={view?.id||'loading'} loadingStatus={status} people={people} jobs={view?.jobs??[]} paused={view?.generationEnabled===false} error={error} onRetry={retry}/>
 
     <div className="artboard" style={{top:`max(0px, calc((100svh - ${941*scale}px) / 2))`,transform:`translateX(-50%) scale(${scale})`,transformOrigin:"top center"}}><OriginalScene assets={assets} activeId={activeSlot} pristine={false} editingInput={true}/><CandleHome onStrategy={()=>setStrategyOpen(true)} onEvents={()=>setEventsOpen(true)}/>
       <aside className="character-rail" aria-label="对话人物"><div className="character-list">{visible.map((p,i)=><button key={p.id} className={`character-card ${selected===p.id?'selected':''}`} aria-label={`${p.name} · ${p.role}`} aria-pressed={selected===p.id} onClick={()=>setSelected(p.id)}>{!assets.characters[i].card&&<span className="asset-pending">{view?.generationEnabled===false?'等待补充素材':statusText[view?.jobs.filter(j=>j.kind==='portrait'&&j.subjectId===p.id).at(-1)?.status||'queued']}</span>}</button>)}</div></aside>

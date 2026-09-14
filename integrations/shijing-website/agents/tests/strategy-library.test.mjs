@@ -1,12 +1,12 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,rmSync,mkdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {Store} from '../dist/store.js';
 import {WorldAgent,demoWorld,demoSettlements} from '../dist/world-agent.js';
 import {makeServer} from '../dist/server.js';
 const spec={id:'shared-spec',title:'诸葛亮北伐',scenario:{background:'公元228年春。汉中向长安进军。'},cast:[{id:'wei-yan',name:'魏延',role:'将领',description:'测试'}],metrics:[]};
-function setup(t){const dir=mkdtempSync(fileURLToPath(new URL('./.runtime/library-',import.meta.url))),store=new Store(dir),agent=new WorldAgent(store);t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true});});return{store,agent,id:store.create(spec).id,dir};}
+function setup(t){mkdirSync(fileURLToPath(new URL("./.runtime/",import.meta.url)),{recursive:true});const dir=mkdtempSync(fileURLToPath(new URL('./.runtime/library-',import.meta.url))),store=new Store(dir),agent=new WorldAgent(store);t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true});});return{store,agent,id:store.create(spec).id,dir};}
 const order=(a,id,commandId,kind,extra={})=>a.localOrder(id,{commandId,expectedRevision:a.getWorld(id).revision,armyId:'army-wei-yan',kind,...extra});
 test('one topic is one data unit even when scenario ids match; reads share state without advancing',t=>{const {store,agent,id}=setup(t),second=store.create(spec).id;const index=agent.strategyLibrary();assert.equal(index.maps.length,2);assert.notEqual(id,second);assert.deepEqual(new Set(index.maps.map(m=>m.topicId)),new Set([id,second]));const snapshot=agent.getWorld(id);const map=agent.strategyMap(id);assert.equal(map.topicId,id);assert.equal(map.data.armies[0].food,snapshot.armies['army-wei-yan'].foodKg);assert.deepEqual(agent.getWorld(id),snapshot);assert.ok(index.maps.every(m=>m.status==='ready'&&m.strategies.length===0));});
 test('ongoing strategy reads live changes through the same topic id',t=>{const {agent,id}=setup(t);order(agent,id,'march','march',{targetCityId:'changan'});let index=agent.strategyLibrary().maps[0];assert.equal(index.status,'active');assert.equal(index.strategies.length,1);const d=index.strategies[0].id;agent.localAdvance(id,{commandId:'day',expectedRevision:1,hours:24});const map=agent.strategyMap(id,d);assert.equal(map.historical,false);assert.equal(map.data.armies.find(a=>a.id==='army-wei-yan').food,54000);assert.equal(map.data.revision,2);assert.ok(!agent.strategyLibrary().maps[0].strategies.some(d=>d.title==='驻守休整'));});

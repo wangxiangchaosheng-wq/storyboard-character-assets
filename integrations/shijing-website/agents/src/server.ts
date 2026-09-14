@@ -49,7 +49,8 @@ export function makeServer(store:Store,worker:Worker){
           if(key)store.db.prepare('INSERT INTO starts VALUES(?,NULL,?)').run(key,'pending');
           try{
             let id:string;
-            if(b.spec)id=store.create(parseSpec(b.spec),(b.cities??{}) as Record<string,string>).id;
+            if(b.researchTopic)id=(await engine.researchTopic(b.researchTopic)).id;
+            else if(b.spec)id=store.create(parseSpec(b.spec),(b.cities??{}) as Record<string,string>).id;
             else{assert(typeof b.topic==='string'&&b.topic.length>0&&b.topic.length<=20000,'议题内容无效');assert(typeof b.player==='string'&&b.player.length>0&&b.player.length<100,'玩家身份无效');id=(await engine.start(b.topic,b.player)).id;}
             if(key)store.db.prepare("UPDATE starts SET status='done',run_id=? WHERE id=?").run(id,key);out=view(store,id);
           }catch(e){if(key)store.db.prepare("UPDATE starts SET status='interrupted' WHERE id=?").run(key);throw e;}
@@ -76,12 +77,12 @@ export function makeServer(store:Store,worker:Worker){
         else if(method==='GET'&&path[2]==='manifest'){out={version:1,entries:[...new Map(store.jobs(id).filter(j=>j.status==='succeeded').map(j=>[`${j.kind}/${j.subjectId}`,j])).values()].map(j=>({key:`${j.kind==='portrait'?'portrait':'event'}/${j.subjectId}`,category:j.kind==='portrait'?'portrait':j.majorEvent?'major-event':'event',file:`/api/agents/assets/${j.asset}`,alt:j.plan?.summary||j.subjectId,w:j.kind==='portrait'?1024:j.majorEvent?1537:904,h:j.kind==='portrait'?1024:j.majorEvent?636:1602}))};}
         else if(method==='POST'&&path[2]==='events'){assert(store.run(id).mode==='standalone','已连接引擎的对局只能同步引擎裁判结果',409);store.apply(id,await body(req) as unknown as Settlement);out=view(store,id);}
         else if(method==='POST'&&path[2]==='sync'){await engine.sync(id);out=view(store,id);}
-        else if(method==='POST'&&path[2]==='messages'){const input=await body(req);if(store.run(id).mode==='standalone')worlds.localMessage(id,input);else await engine.message(id,input as Parameters<EngineBridge['message']>[1]);out=view(store,id);}
+        else if(method==='POST'&&path[2]==='messages'){const input=await body(req);if(store.run(id).mode==='standalone'){if(input.act===false&&process.env.SIM_ENGINE_URL)await engine.discussLocal(id,input as Parameters<EngineBridge['discussLocal']>[1]);else worlds.localMessage(id,input);}else await engine.message(id,input as Parameters<EngineBridge['message']>[1]);out=view(store,id);}
         else throw new AgentError('接口不存在',404);
       }else if(method==='POST'&&path[0]==='jobs'&&path[2]==='retry'){const job=store.retry(path[1]);generationRun=job.runId;out=job;}
       else throw new AgentError('接口不存在',404);
       res.writeHead(method==='POST'?202:200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(out));
-      if(method==='POST'&&path[0]==='runs'&&path[1]&&['events','sync','messages'].includes(path[2])&&!worlds.getWorld(path[1])?.simulation)generationRun=path[1];
+      if(method==='POST'&&path[0]==='runs'&&path[1]&&['events','sync','messages','world-order','world-advance'].includes(path[2])&&(process.env.AGENT_ALLOW_API_GENERATION==='true'||!worlds.getWorld(path[1])?.simulation))generationRun=path[1];
       if(generationRun)void worker.drain(generationRun);
     }catch(e){res.writeHead(e instanceof AgentError?e.status:500,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify({error:e instanceof AgentError?e.message:'任务处理失败，请查看本机服务状态'}));}
   });

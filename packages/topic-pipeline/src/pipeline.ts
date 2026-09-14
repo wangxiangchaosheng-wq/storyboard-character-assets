@@ -17,6 +17,7 @@ import { checkAlignment } from './validate.ts';
 import type { PipelineHook, PipelineResult } from './types.ts';
 
 export interface PipelineOpts {
+  researchOnly?: boolean;
   chat?: ChatProvider;           // 缺省取 providers.chat
   providers?: ProviderSet;
   onStatus?: PipelineHook;       // 阶段切换上报（服务层转 SSE）
@@ -59,7 +60,7 @@ export async function runPipeline(
     let spec;
     let meta;
     try {
-      ({ spec, meta } = await generateSpec(brief, chat, { fill, facts: opts.facts }));
+      ({ spec, meta } = await generateSpec(brief, chat, { fill, facts: opts.facts, researchOnly: opts.researchOnly }));
     } catch (e) {
       status = makeStatus(topicId, 'failed', 0.7, 0, {
         lastRevision: [e instanceof Error ? e.message : String(e)],
@@ -92,7 +93,7 @@ export async function runPipeline(
       await emit(status);
       // 修正信号：把校验问题回灌给生成器再生成一次（真实模式下收敛）
       try {
-        ({ spec, meta } = await generateSpec(brief, chat, { fill, facts: opts.facts }));
+        ({ spec, meta } = await generateSpec(brief, chat, { fill, facts: opts.facts, researchOnly: opts.researchOnly }));
       } catch (e) {
         status = makeStatus(topicId, 'failed', 0.8, round, {
           lastRevision: [e instanceof Error ? e.message : String(e)],

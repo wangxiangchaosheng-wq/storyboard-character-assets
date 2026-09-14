@@ -4,6 +4,7 @@
  * → status / spec 从库里读（断线后仍可查）。
  * 真实管线：mock provider 时全链路离线可跑（URL 分支仍受 safeFetch 门禁）。
  */
+import { createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { runPipeline } from '@sim/topic-pipeline';
@@ -49,7 +50,10 @@ export function registerTopicRoutes(
     }
     const input = parsed.data;
     // 轻量指纹做 topicId：URL 用原文，文本用内容前 16 字（同输入可复用/幂等）
-    const topicId = input.kind === 'url' ? input.url : 'txt:' + input.text.slice(0, 16);
+    const researchOnly = (req.body as {researchOnly?: unknown}).researchOnly === true;
+    const topicId = researchOnly
+      ? 'research:' + createHash('sha256').update(JSON.stringify(input)).digest('hex')
+      : input.kind === 'url' ? input.url : 'txt:' + input.text.slice(0, 16);
     saveTopic(store, topicId, { status: 'idle', input: JSON.parse(JSON.stringify(input)) });
     return reply.code(202).send({ topicId, state: 'idle' });
   });
@@ -67,12 +71,15 @@ export function registerTopicRoutes(
     reply.code(202).send({ accepted: true });
 
     // 后台执行：阶段状态写库（status 各节点经 saveTopic），进度事件经 SSE 推送
-    const input = id.startsWith('http')
-      ? ({ kind: 'url', url: id } as const)
-      : ({ kind: 'text', text: id.slice(4) } as const);
+    // Use the saved input: a topic id is not a copy of its full content.
+    const saved = getTopic(store, id);
+    const input = ingestSchema.parse(saved?.input ? JSON.parse(saved.input) : (
+      id.startsWith('http') ? { kind: 'url', url: id } : { kind: 'text', text: id.slice(4) }
+    ));
     void (async () => {
       const factService = await facts; // 考据司检索库（PRESET 预置史实快照）
       await runPipeline(input, {
+        researchOnly: id.startsWith('research:'),
         providers,
         onStatus: (s) => {
           saveTopic(store, id, { status: s.state === 'ready' ? 'ready' : 'running' });
