@@ -12,4 +12,4 @@ export function validateDesign(value:unknown):asserts value is PortraitDesign {
  for(const k of [...actionKeys,'scoreReason'])assert(typeof d.actionSignature?.[k]==='string'&&String(d.actionSignature[k]).trim(),'Action Signature 不完整：'+k,422);
  assert(Number.isFinite(d.actionSignature.score)&&d.actionSignature.score>=8&&d.actionSignature.score<=10,'动作特异性未达到 8/10，不能进入绘图',422);
 }
-export const styleBible='工笔水墨与淡水彩手绘人物；统一低饱和旧金、米白、墨黑；细致清楚线条、克制材质和柔和均匀光线；腰部以上半身，主体高度84%–92%，同一人物比例与视角；完整头冠、双手和唯一道具；允许人物与道具靠近顶部和左右边缘，不要求固定留白；头冠、双手和道具必须完整；衣袍宽幅平直贴底。禁止全身、膝脚、圆弧悬浮收口、场景、文字、水印和多人物。';
+export const styleBible='工笔水墨与淡水彩手绘人物；统一低饱和旧金、米白、墨黑；细致清楚线条、克制材质和柔和均匀光线；腰部以上半身，主体高度84%–92%，同一人物比例与视角；完整头冠、双手和唯一道具；允许人物与道具靠近顶部和左右边缘，不要求固定留白；头冠、双手和道具必须完整；衣袍与袖口可保留自然弧度，底部可留透明空隙，不要求平直贴底。最终交付真实透明 PNG，品红只作抠图中间背景。避免场景、文字、水印和多人物。';
