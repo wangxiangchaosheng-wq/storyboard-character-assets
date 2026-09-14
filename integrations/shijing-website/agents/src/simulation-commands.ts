@@ -4,7 +4,7 @@ import type {SimulationCommand,AdvanceCommand,OrderKind} from './simulation-type
 /** Deliberately bounded grammar: free discussion never becomes a numerical settlement. */
 export function parseLocalCommand(w:WorldSnapshot,text:string,commandId:string):{kind:'order';input:SimulationCommand}|{kind:'advance';input:AdvanceCommand}{
  const s=w.simulation;assert(s,'当前议题没有可用的本地战役');const line=text.trim().replace(/[。！!]+$/,'');
- const time=line.match(/^(?:推进|继续推演|推演)\s*(\d+)\s*(小时|天|日)$/);
+ const time=line.match(/^(?:推进|继续推演|推演)\s*(\d+)\s*(小时|天|日)(?:\s|$)/);
  if(time)return{kind:'advance',input:{commandId,expectedRevision:w.revision,hours:Number(time[1])*(time[2]==='小时'?1:24)}};
  const help='本地指令示例：魏延 行军 长安；魏延 急行军 长安；魏延 进攻 长安；魏延 围困 长安；魏延 撤退 汉中；魏延 休整；魏延 补给 汉中 10000；推进 1 天。讨论或假设不会执行。';
  const army=Object.values(w.armies).filter(a=>a.factionId===s.playerFactionId&&s.activeArmyIds.includes(a.id)).find(a=>line.startsWith(a.name+' ')||line.startsWith(a.commander.name+' ')||line.startsWith(a.name)||line.startsWith(a.commander.name));assert(army,help);
