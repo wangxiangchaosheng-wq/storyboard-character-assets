@@ -4,9 +4,9 @@ export type Metric = {key:string;label:string;start:number;min:number;max:number
 export type Spec = {id:string;title:string;scenario:{background:string};cast:Persona[];metrics:Metric[]};
 export type World = {version:number;day:number;metrics:Record<string,number>;cities:Record<string,string>};
 export type Settlement = {id:string;expectedVersion:number;confirmed:true;summary:string;deltas:{metric:string;by:number}[];elapsedDays:number;cityChanges:{city:string;from:string;to:string}[];significant:boolean};
-export type Message = {id:string;kind:string;name?:string;from?:string;text:string;deltas?:{metric:string;by:number}[]};
+export type Message = {id:string;kind:string;name?:string;from?:string;text:string;deltas?:{metric:string;by:number}[];day?:number};
 export type Run = {id:string;spec:Spec;world:World;mode:'standalone'|'engine';gameId?:string;engineTurn:number;messages:Message[];createdAt:string};
-export type Job = {id:string;runId:string;kind:'portrait'|'storyboard';subjectId:string;majorEvent?:boolean;majorCandidate?:boolean;status:'queued'|'planning'|'generating'|'checking'|'succeeded'|'failed'|'interrupted';attempts:number;draftAttempt?:number;resumeDraft?:boolean;transparency?:'native'|'chroma';input:unknown;priorDesigns?:PortraitDesign[];plan?:ArtPlan;feedback:string;error?:string;asset?:string;assetSource?:'provided'|'generated'|'library';createdAt:string;updatedAt:string;trace:{at:string;step:string;detail:string}[]};
+export type Job = {id:string;runId:string;kind:'portrait'|'storyboard';subjectId:string;majorEvent?:boolean;majorCandidate?:boolean;status:'queued'|'planning'|'generating'|'checking'|'succeeded'|'failed'|'interrupted';attempts:number;draftAttempt?:number;resumeDraft?:boolean;transparency?:'native'|'chroma';input:unknown;priorDesigns?:PortraitDesign[];plan?:ArtPlan;feedback:string;error?:string;asset?:string;assetSource?:'provided'|'generated'|'library'|'prefab';createdAt:string;updatedAt:string;trace:{at:string;step:string;detail:string}[]};
 export type ArtPlan = {prompt:string;summary:string;night:boolean;evidence:string[];portraitDesign?:PortraitDesign};
 export class AgentError extends Error {status:number;constructor(message:string,status=400){super(message);this.status=status;}}
 export function assert(ok:unknown,message:string,status=400):asserts ok {if(!ok)throw new AgentError(message,status);}

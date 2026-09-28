@@ -2,6 +2,7 @@
   "name": "sites-project",
   "version": "0.1.0",
   "private": true,
+  "main": "electron/dist/main.mjs",
   "engines": {
     "node": ">=22.13.0"
   },
@@ -10,10 +11,30 @@
     "build": "vinext build",
     "start": "vinext start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "agents:build": "tsc -p agents/tsconfig.json",
+    "agents:build": "tsc -p agents/tsconfig.json && node steam/build.mjs",
     "agents:start": "node --env-file-if-exists=.env agents/dist/main.js",
     "agents:test": "npm run agents:build && node --test agents/tests/*.test.mjs",
-    "dev:agents": "node scripts/start-agents.mjs"
+    "dev:agents": "node scripts/start-agents.mjs",
+    "dev:vinext": "vinext dev --port 3001",
+    "dev:web": "vinext dev --port 3002",
+    "build:vinext": "vinext build",
+    "start:vinext": "wrangler dev --config dist/server/wrangler.json",
+    "deploy:vinext": "vinext-cloudflare deploy --config dist/server/wrangler.json",
+    "electron:build:main": "tsc -p electron/tsconfig.json",
+    "electron:smoke": "node electron/scripts/smoke.mjs",
+    "electron:verify-pack": "node electron/scripts/verify-pack.mjs",
+    "electron:verify-main": "node electron/scripts/verify-main.mjs",
+    "electron:verify-steam": "node electron/scripts/verify-steam-routes.mjs",
+    "electron:build:web": "vinext build --prerender-all",
+    "electron:dev": "npm run electron:build:main && electron electron/dist/main.mjs --dev",
+    "electron:start": "npm run electron:build:main && electron electron/dist/main.mjs --prod",
+    "electron:pack": "node electron/scripts/pack.mjs",
+    "steam:build": "node steam/build.mjs",
+    "steam:icons": "node steam/make-achievement-icons.mjs",
+    "steam:test": "node --test steam/steam.test.mjs steam/icons.test.mjs steam/depot-upload.test.mjs",
+    "steam:depot:validate": "node steam/depot-upload.mjs validate",
+    "steam:depot:dry": "node steam/depot-upload.mjs dry-run",
+    "steam:depot:upload": "node steam/depot-upload.mjs upload"
   },
   "dependencies": {
     "next": "16.2.6",
@@ -25,6 +46,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
     "@cloudflare/workers-types": "4.20260515.1",
+    "@node-steam/vdf": "^2.2.0",
     "@openai/sites-vite-plugin": "^0.1.0 || ^0.2.0",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
@@ -32,6 +54,8 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
+    "electron": "^41.2.1",
+    "electron-builder": "^24.13.3",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
     "react-server-dom-webpack": "19.2.6",
@@ -41,5 +65,8 @@
     "vite": "8.0.13",
     "wrangler": "4.92.0"
   },
-  "type": "module"
+  "type": "module",
+  "optionalDependencies": {
+    "steamworks.js": "^0.4.0"
+  }
 }

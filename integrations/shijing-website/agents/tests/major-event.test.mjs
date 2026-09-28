@@ -5,7 +5,7 @@ test('major event image is validated and fitted to exact landscape dimensions',a
 const awaitable=await sharp({create:{width:904,height:1602,channels:3,background:'#ddd'}}).png().toBuffer();
 test('major generation requests landscape and classification uses only confirmed result context',async()=>{
  const p=new OpenAIArt();let body;p.request=async(path,b)=>{body=b;return {data:[{b64_json:Buffer.from('fixture').toString('base64')}]};};
- await p.generate({kind:'storyboard',majorEvent:true,plan:{prompt:'已确认结果，架空推演，公元228年',summary:'关键战局逆转',night:false}});assert.equal(body.size,'1536x640');assert.match(body.prompt,/1537:636/);assert.doesNotMatch(body.prompt,/452:801/);
+ await p.generate({kind:'storyboard',majorEvent:true,input:{requireFreshArt:true},plan:{prompt:'已确认结果，架空推演，公元228年',summary:'关键战局逆转',night:false}});assert.equal(body.size,'1536x640');assert.match(body.prompt,/1537:636/);assert.doesNotMatch(body.prompt,/452:801/);
  p.structured=async(name,instructions)=>{assert.match(instructions,/未决方案/);return {major:false};};assert.equal(await p.classifyMajor({input:{event:{summary:'只是提出计划'}}}),false);
 });
 test('major event does not replace ordinary story or reopen initial preparation',()=>{const jobs=[{kind:'portrait',subjectId:'p',status:'succeeded',asset:'p'},{kind:'storyboard',status:'succeeded',asset:'s'},{kind:'storyboard',majorEvent:true,status:'generating'}];assert.equal(preparationReady(['p'],jobs,['/api/agents/assets/p','/api/agents/assets/s']),true);});

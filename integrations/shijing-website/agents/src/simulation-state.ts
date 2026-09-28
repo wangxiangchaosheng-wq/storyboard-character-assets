@@ -9,20 +9,58 @@ export function seedSimulation(w:WorldSnapshot):SimulationState {
   const attacking=a.id==='army-wei-yan',transportPeople=attacking?1000:300;
   armies[a.id]={fatigue:20,wounded:0,dead:0,captured:0,deserted:0,transportPeople,
    initialPeople:a.troops+transportPeople,training:1,equipment:1,siegePower:attacking?0:1,
-   capacityKg:attacking?65000:25000,waterLitres:(a.troops+transportPeople)*4,
+   // 魏延部（北伐军）携粮上限 120t：按 transit 约 16.7 天、6000 人日耗 6000kg 算，到长安城下
+   // 需约 100t，另留 ~20t 作围城启动。65000kg 只够 10.8 天，是「奇袭流算术上无解」的主因——
+   // 城里躺着 30000kg 却因容量上限带不走。守军仍是 25000，不受影响。
+   capacityKg:attacking?120000:25000,waterLitres:(a.troops+transportPeople)*4,
    foodDeficitHours:0,waterDeficitHours:0,rationRatio:1,waterRatio:1,lastCombatHour:-100,
    roadId:null,roadKm:0,atCityId:a.location.kind==='city'?a.location.cityId:null,
    order:null,knownRoads:attacking?['road-ziwu']:[],effects:[],lossCarry:0,recoveryCarry:0,desertCarry:0};
  }
+ // 运输人力由省人口出（P 社那套「上限量挂在人口上，不当隐藏常数」）：汉中 267,402 口
+ // × 0.3% ≈ 800，与原 tuned 值一致；其余城池不再一律为 0。此前只有汉中有运力，
+ // 军队一旦上路就再也收不到任何补给——实测奇袭队粮尽只能在路上爬，玩家毫无办法。
+  // 率取 0.299%：汉中 267,402 口 × 0.299% = 800（与原 tuned 值逐户对齐），
+  // 于是换算式子不换平衡；其余城池据此得实数运力。
+  const TRANSPORT_RATE=.00299;
+ const cityTransport=(cityId:string):number=>{
+  const p=Object.values(w.provinces||{}).find(x=>x.seatCityId===cityId);
+  return p?.census?Math.max(50,Math.round(p.census.population*TRANSPORT_RATE)):0;
+ };
  const cities=Object.fromEntries(Object.values(w.cities).map(c=>[c.id,{
   residents:c.id==='changan'?5000:c.id==='hanzhong'?2000:0,
-  transportAvailable:c.id==='hanzhong'?800:0,initialResidents:c.id==='changan'?5000:c.id==='hanzhong'?2800:0,
+  transportAvailable:cityTransport(c.id),initialResidents:c.id==='changan'?5000:c.id==='hanzhong'?2800:0,
   waterAccessible:true,blockadeBy:[],gateOpen:false,
  }]));
  const s:SimulationState={version:1,mode:'local',profile:localProfile(),timeHours:0,playerFactionId:'shu',activeArmyIds:['army-wei-yan','army-changan'],armies,cities,
-  roads:{'road-ziwu':{id:'road-ziwu',from:'hanzhong',to:'changan',distanceKm:240,terrainFactor:.75,capacityPeople:12000,open:true,waterAccessible:true,weatherFactor:1,
-   source:'模拟路线：240km、道路容量与修正用于首版机制验证，未经历史地理校准；地图路径不参与距离换算。'}},
-  shipments:{},intelligence:[],pauseReason:null,ledger:{initialFoodKg:0,consumedKg:0,spoiledKg:0,initialPeople:0,transportCaptured:0}};
+  // 第 5 轮：季节传闻的机制状态（到案即挂、到期自解）。开局空表，随传闻卡到场而增长。
+  seasonal:[],
+  // 道路网只通到「满携粮一次走得到」的距离：120t ≈ 20 日口粮，有效速度约 15km/日，
+  // 单段超过 200km 就走不完（子午谷 240km 已是极限，实测到城下只剩 ~20t）。
+  // 为什么必须有这几条路：只有汉中↔长安时，玩家最多拿下长安（3/12 城），
+  // 「城池过半」的胜利线永远够不着——一局打到头也是师老无功。打通崤函、陇右、
+  // 河内、鸿沟、江淮后，汉中→长安→洛阳→并州/徐州才构成一条真打得通的北伐线，
+  // 且每段都在一次携粮范围内，粮道本身就是这条线的约束。
+  roads:{
+   'road-ziwu':{id:'road-ziwu',from:'hanzhong',to:'changan',distanceKm:240,terrainFactor:.75,capacityPeople:12000,open:true,waterAccessible:true,weatherFactor:1,
+    source:'模拟路线：240km、道路容量与修正用于首版机制验证，未经历史地理校准；地图路径不参与距离换算。'},
+   'road-jiange':{id:'road-jiange',from:'chengdu',to:'hanzhong',distanceKm:160,terrainFactor:.85,capacityPeople:15000,open:true,waterAccessible:true,weatherFactor:1,
+    source:'模拟路线：成都—汉中，蜀中转输主道；里程按可通勤规模取，未经历史地理校准。'},
+   'road-hangu':{id:'road-hangu',from:'changan',to:'luoyang',distanceKm:200,terrainFactor:.9,capacityPeople:20000,open:true,waterAccessible:true,weatherFactor:.95,
+    source:'模拟路线：长安—洛阳（崤函道），出关中主路；弘农间多坂，故仍不及平地。'},
+   'road-longyou':{id:'road-longyou',from:'changan',to:'liangzhou',distanceKm:200,terrainFactor:.8,capacityPeople:12000,open:true,waterAccessible:true,weatherFactor:.95,
+    source:'模拟路线：长安—凉州（陇右道），河西走廊入口，道险而粮寡。'},
+   'road-zhenbian':{id:'road-zhenbian',from:'luoyang',to:'bingzhou',distanceKm:160,terrainFactor:.85,capacityPeople:15000,open:true,waterAccessible:true,weatherFactor:.95,
+    source:'模拟路线：洛阳—并州（河内道），跨河而北，太原之锁钥。'},
+   'road-honggou':{id:'road-honggou',from:'luoyang',to:'xuzhou',distanceKm:180,terrainFactor:.95,capacityPeople:25000,open:true,waterAccessible:true,weatherFactor:1,
+    source:'模拟路线：洛阳—徐州（鸿沟水网），平原漕路，通行修正是全网最好。'},
+   'road-jianghuai':{id:'road-jianghuai',from:'xuzhou',to:'jingzhou',distanceKm:200,terrainFactor:.9,capacityPeople:20000,open:true,waterAccessible:true,weatherFactor:1,
+    source:'模拟路线：徐州—荆州（江淮—荆襄道），东线入楚之路；吴扬之局自此可及。'},
+  },
+  shipments:{},intelligence:[],pauseReason:null,ledger:{initialFoodKg:0,consumedKg:0,spoiledKg:0,producedKg:0,initialPeople:0,transportCaptured:0}};
+  // producedKg 记「开局之后新产的粮」。没有它，「开局国力」就算不出来——
+  // initialFoodKg 被 accrueProvinceFood 一路累加，早就是「开局 + 期间产出」了。
+  // 守恒式仍成立：初始(含产出) = 现量 + 消耗 + 损耗，产出只是被单列出来。
  s.ledger.initialFoodKg=foodTotal(w,s);
  s.ledger.initialPeople=peopleTotal(w,s);
  return s;
@@ -88,7 +126,16 @@ export function validateSimulation(w:WorldSnapshot):void {
   assert(['travelling','waiting','delivered','captured','returning','returned'].includes(c.status),'运输状态无效');
   count(c.carriers);finite(c.cargoKg);finite(c.rationKg);finite(c.roadKm,0,s.roads[c.roadId].distanceKm);finite(c.targetKm,0,s.roads[c.roadId].distanceKm);
  }
- for(const v of Object.values(s.ledger))finite(v);
+ // 季节传闻状态：key 必须是字符串、到期日必须有限。旧存档没有这个字段——缺了就当没有传闻，
+ // 不该因此把整局旧档判废（后加字段的一贯纪律）。
+ if(s.seasonal!==undefined){
+  assert(Array.isArray(s.seasonal)&&s.seasonal.length<=8,'季节传闻状态无效');
+  for(const x of s.seasonal){assert(typeof x.key==='string'&&x.key.length>0&&x.key.length<=60,'传闻标记无效');finite(x.untilDay);}
+ }
+ // 逐项查有限数。跳过 undefined：producedKg 是后加的字段，旧存档/手搓 fixture 里合法缺失
+ // （缺了就当 0 用），不该因此判「数值越界」。
+ for(const v of Object.values(s.ledger))if(v!==undefined)finite(v);
+ if(s.ledger.producedKg===undefined)s.ledger.producedKg=0;
  assert(Math.abs(foodTotal(w,s)+s.ledger.consumedKg+s.ledger.spoiledKg-s.ledger.initialFoodKg)<.001,'粮草收支不守恒');
  assert(peopleTotal(w,s)===s.ledger.initialPeople,'全局人员收支不守恒');
 }

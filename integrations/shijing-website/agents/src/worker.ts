@@ -58,7 +58,7 @@ export class Worker {
           if(this.provider.preflight){const preflight=await this.provider.preflight(job,draft);if(!preflight.pass)throw new AgentError(preflight.reason,422);}
           const png=await(this.provider.prepare?this.provider.prepare(job,draft,qa):prepare(draft,job.kind,job.majorEvent));
           const review=await this.provider.review(job,png);if(!review.pass)throw new AgentError(review.reason,422);
-          this.store.saveAsset(job,png);job.assetSource='generated';job.error=undefined;job.resumeDraft=false;if(job.kind==='portrait'&&this.library){const persona=this.store.run(job.runId).spec.cast.find(p=>p.id===job.subjectId);if(persona)this.library.remember(persona,png,job);}
+          this.store.saveAsset(job,png);job.assetSource=job.assetSource??'generated';job.error=undefined;job.resumeDraft=false;if(job.kind==='portrait'&&this.library){const persona=this.store.run(job.runId).spec.cast.find(p=>p.id===job.subjectId);if(persona)this.library.remember(persona,png,job);}
           if(job.kind==='storyboard'&&this.stories){try{this.stories.remember(job,png);}catch{job.trace.push({at:new Date().toISOString(),step:'cache-warning',detail:'图片已保存，本次未写入复用库'});}}
           this.store.step(job,'succeeded','图片通过原 Skill 检查并已保存');break;
         }catch(e){

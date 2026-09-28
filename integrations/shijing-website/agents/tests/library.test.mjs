@@ -9,8 +9,8 @@ import {Worker} from '../dist/worker.js';
 import {Store} from '../dist/store.js';
 const library=new AssetLibrary(fileURLToPath(new URL('../../人物素材库/',import.meta.url)));
 const spec=JSON.parse(readFileSync(new URL('../examples/ziwu.json',import.meta.url))).spec;
-test('library: all 30 portraits have usable transparent PNGs; explicit aliases keep genders separate',async()=>{
- assert.equal(library.entries().filter(e=>e.source==='provided').length,30);
+test('library: all 31 portraits have usable transparent PNGs; explicit aliases keep genders separate',async()=>{
+ assert.equal(library.entries().filter(e=>e.source==='provided').length,31);
  for(const entry of library.entries())assert.ok(await library.find({name:entry.name}));
  assert.equal((await library.find({name:'曹睿'})).entry.name,'曹叡');
  assert.equal((await library.find({name:'人大政治专业大三学生'})).entry.name,'穿越大学生');

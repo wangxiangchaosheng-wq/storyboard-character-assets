@@ -13,7 +13,7 @@ import {parseSpec} from '../dist/contracts.js';
 
 const rounded = async (background='#00000000') => sharp({create:{width:512,height:512,channels:4,background}})
   .composite([{input:Buffer.from('<svg width="512" height="512"><ellipse cx="256" cy="230" rx="150" ry="180" fill="#ad8040"/></svg>')}]).png().toBuffer();
-function directory(t){const p=mkdtempSync(join(tmpdir(),'portrait-alpha-'));t.after(()=>rmSync(p,{recursive:true,force:true}));return p;}
+function directory(t){const p=mkdtempSync(join(tmpdir(),'portrait-alpha-'));t.after(()=>{try{rmSync(p,{recursive:true,force:true,maxRetries:5,retryDelay:100});}catch{/* Windows 文件锁：目录留给系统临时目录自清，不拖垮测试 */}});return p;}
 
 test('transparent rounded portrait with a bottom gap passes; opaque and empty PNGs fail',async()=>{
   await inspectPortrait(await rounded());

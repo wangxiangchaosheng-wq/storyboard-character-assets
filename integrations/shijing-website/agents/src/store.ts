@@ -20,12 +20,17 @@ export class Store {
   }
   transaction<T>(fn:()=>T):T {this.db.exec('BEGIN IMMEDIATE');try{const result=fn();this.db.exec('COMMIT');return result;}catch(e){this.db.exec('ROLLBACK');throw e;}}
   run(id:string):Run {const r=this.db.prepare('SELECT payload FROM runs WHERE id=?').get(id);assert(r,'对局不存在',404);return JSON.parse(String(r.payload));}
-  runs():Run[]{return this.db.prepare('SELECT payload FROM runs ORDER BY rowid DESC LIMIT 30').all().map(r=>JSON.parse(String(r.payload)));}
+  /** 分页：limit 缺省 30 兼容旧调用方，offset 供首页「加载更多」；上限 200 防一次拖全库。 */
+  runs(limit=30,offset=0):Run[]{const n=Number.isInteger(limit)&&limit>0?Math.min(limit,200):30,o=Number.isInteger(offset)&&offset>0?offset:0;return this.db.prepare('SELECT payload FROM runs ORDER BY rowid DESC LIMIT ? OFFSET ?').all(n,o).map(r=>JSON.parse(String(r.payload)));}
   saveRun(r:Run){this.db.prepare('INSERT OR REPLACE INTO runs VALUES(?,?)').run(r.id,JSON.stringify(r));}
   create(spec:Spec,cities:Record<string,string>={},engine?:{gameId:string;messages:Run['messages'];state:Record<string,number>;turn:number},onCreated?:(run:Run)=>void):Run {
     const r:Run={id:randomUUID(),spec,world:initialWorld(spec,cities),mode:engine?'engine':'standalone',gameId:engine?.gameId,engineTurn:engine?.turn??0,messages:engine?.messages??[],createdAt:new Date().toISOString()};
     if(engine){for(const m of spec.metrics)assert(Number.isFinite(engine.state[m.key])&&engine.state[m.key]>=m.min&&engine.state[m.key]<=m.max,'引擎初始状态无效');r.world.metrics={...engine.state};}
     const worlds=new WorldAgent(this);
+    // 注意：bootstrapRunInTransaction 返回 false 是**合法**的——buildInitialWorld 对议题文案
+    // 有文本门槛，够不着就返回 null，那种对局留给调用方随后经 `initializeWorld` 显式给初始
+    // 世界（见 world-bootstrap.ts 里 "left for explicit upstream initialization" 的注释）。
+    // 所以这里不能断言「必须有世界」：上游引擎局、测试 fixture、非三国题材的议题都靠那条路。
     this.transaction(()=>{this.saveRun(r);worlds.bootstrapRunInTransaction(r);for(const p of spec.cast)this.enqueue(r.id,'portrait',p.id,{persona:p,spec});this.enqueue(r.id,'storyboard','opening',{spec,stage:'开场设定；方案仍是设想，不得画成已经胜利',world:this.run(r.id).world});onCreated?.(this.run(r.id));});return this.run(r.id);
   }
   enqueue(runId:string,kind:Job['kind'],subjectId:string,input:unknown):Job {
@@ -53,5 +58,18 @@ export class Store {
     this.saveRun(r);if(event.significant)this.enqueue(runId,'storyboard',event.id,{spec:r.spec,event,world:r.world,majorEvent:true});return r;
   });}
   history(id:string){this.run(id);return this.db.prepare('SELECT payload FROM events WHERE run_id=? ORDER BY rowid').all(id).map(x=>JSON.parse(String(x.payload)));}
+  /** UX-007/BUG-109：整局删除（议题列表的删除入口 + 建局失败的孤儿清理）。
+   *  一局的数据散在 runs/jobs/events/starts/commands 与 world_* 各表里；除 runs 按 id、
+   *  其余表凡带 run_id 列的一并清掉，不留孤儿。表清单查 sqlite_master，新增表自动覆盖。 */
+  deleteRun(id:string):void{
+    this.transaction(()=>{
+      this.run(id);
+      for(const t of this.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r=>String(r.name))){
+        if(!/^[\w]+$/.test(t))continue;
+        if(t==='runs'){this.db.prepare('DELETE FROM runs WHERE id=?').run(id);continue;}
+        if(this.db.prepare(`PRAGMA table_info(${t})`).all().some(c=>String(c.name)==='run_id'))this.db.prepare(`DELETE FROM ${t} WHERE run_id=?`).run(id);
+      }
+    });
+  }
   close(){this.db.close();}
 }

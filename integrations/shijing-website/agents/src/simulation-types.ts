@@ -1,6 +1,6 @@
 import type {Point} from './world-contracts.js';
 
-export type OrderKind = 'march'|'forced-march'|'garrison'|'resupply'|'attack'|'besiege'|'retreat';
+export type OrderKind = 'march'|'forced-march'|'garrison'|'resupply'|'attack'|'besiege'|'retreat'|'explore';
 export interface RuleParameter {
   value:number; min:number; max:number; unit:string;
   sourceKind:'simulation'; note:string;
@@ -19,6 +19,9 @@ export interface SimOrder {
   id:string; kind:OrderKind; targetCityId?:string; roadId?:string;
   actionId?:string; sinceHour:number; status:'active'|'completed'|'failed';
   stopReason?:string;
+  /** 这道令**到军中**的时刻（世界小时）。主上的诏令要驿传：未到之前部队原地候旨，
+   *  不移动、不进军、不接战。undefined/0 = 当即生效（AI 代决与本地守军的常例）。 */
+  arrivalHour?:number;
 }
 export interface ArmyModel {
   fatigue:number; wounded:number; dead:number; captured:number; deserted:number;
@@ -31,6 +34,8 @@ export interface ArmyModel {
   effects:{id:string;parameter:'navigation';factor:number;roadId:string;expiresHour:number;group:string}[];
   // Fractional casualty carry avoids systematic rounding-away of small losses.
   lossCarry:number; recoveryCarry:number; desertCarry:number;
+  /** BUG-116：本次溃退（士气崩溃解围）已处置的时刻；缺省=未在溃退期，士气回升即清。 */
+  routedAtHour?:number;
 }
 export interface CityModel {
   residents:number; transportAvailable:number; initialResidents:number;
@@ -40,6 +45,12 @@ export interface Intelligence {
   observerFactionId:string; enemyArmyId:string; seenHour:number;
   atCityId:string|null; roadId:string|null; roadKm:number; estimatedTroops:number;
 }
+/** 季节传闻状态（第 5 轮）：传闻卡到案即挂、到期自解（advanceWorld 每步过滤）。
+ *  旧存档没有这个字段——可选，validateSimulation 对 undefined 放行。 */
+export interface SeasonalState {key:string;untilDay:number}
+/** 当前是否挂着某条季节传闻（未到期）。纯查表，引擎/驿传两处共用同一口径。 */
+export const seasonalActive=(s:{seasonal?:SeasonalState[];timeHours:number}|undefined,key:string)=>
+ !!s?.seasonal?.some(x=>x.key===key&&x.untilDay>s.timeHours/24);
 export interface Shipment {
   id:string; sourceCityId:string; targetArmyId:string; factionId:string;
   roadId:string; roadKm:number; targetKm:number; carriers:number;
@@ -52,8 +63,12 @@ export interface SimulationState {
   playerFactionId:string; activeArmyIds:string[];
   armies:Record<string,ArmyModel>; cities:Record<string,CityModel>; roads:Record<string,Road>;
   shipments:Record<string,Shipment>; intelligence:Intelligence[];
+  /** 在身的季节传闻（key=传闻卡 id，untilDay=到期日）。见 SeasonalState。 */
+  seasonal?:SeasonalState[];
   pauseReason:string|null;
-  ledger:{initialFoodKg:number;consumedKg:number;spoiledKg:number;initialPeople:number;transportCaptured:number};
+  /** ledger 是粮草与人口的收支账。initialFoodKg 含期间产出（accrueProvinceFood 会累加），
+   *  所以要「开局存量」得用 initialFoodKg − producedKg。单列产出正是为此。 */
+  ledger:{initialFoodKg:number;consumedKg:number;spoiledKg:number;producedKg:number;initialPeople:number;transportCaptured:number};
 }
 export interface EffectProposal {id:'route-familiarity';factor:number;roadId:string;durationHours:number;reason:string}
 export interface SimulationCommand {
@@ -68,6 +83,9 @@ export interface CalculationTrace {
 export interface SimulationReport {
   commandId:string;kind:'order'|'advance';advancedHours:number;pauseReason:string|null;
   rulesVersion:string; traces:CalculationTrace[]; summaries:string[];
+  /** 本段推进跨过的史实锚点行（anchors.ts）。与 summaries 里的【史】行同源；单列一份
+   *  是为了让跳转按结构汇总、界面按条目渲染，而不是去 parse 文本。 */
+  history?:string[];
 }
 export const clamp=(value:number,min=0,max=100)=>Math.min(max,Math.max(min,value));
 export const round=(value:number)=>Math.round(value*1e8)/1e8;

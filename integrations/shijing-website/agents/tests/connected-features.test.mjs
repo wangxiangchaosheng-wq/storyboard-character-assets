@@ -7,7 +7,7 @@ import {Store} from '../dist/store.js';
 import {EngineBridge} from '../dist/engine.js';
 import {WorldAgent} from '../dist/world-agent.js';
 const spec={id:'north',title:'诸葛亮北伐',scenario:{background:'公元228年，汉中向长安进军。'},cast:[{id:'wy',name:'魏延',role:'将领',description:'谨慎讨论补给'}],metrics:[]};
-function setup(t){const dir=mkdtempSync(join(tmpdir(),'connected-'));const store=new Store(dir);t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true})});return{store,id:store.create(spec).id,worlds:new WorldAgent(store)}}
+function setup(t){const dir=mkdtempSync(join(tmpdir(),'connected-'));const store=new Store(dir);t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true})});const id=store.create(spec).id;const worlds=new WorldAgent(store);worlds.decide(id,{commandId:'settle-opening',expectedRevision:worlds.getWorld(id).revision,choiceId:'decline'});return{store,id,worlds}}
 test('teammate reply is idempotent and cannot overwrite world numbers',async t=>{
  const {store,id,worlds}=setup(t),bridge=new EngineBridge(store);let calls=0;const before=worlds.getWorld(id);
  bridge.request=async(path,body)=>{calls++;assert.equal(path,'/api/local-world/reply');assert.ok(!JSON.stringify(body.observation).includes('army-changan'));return{speaker:'wy',reply:'先保障补给，再议进军。',troops:999999}};
@@ -16,7 +16,7 @@ test('teammate reply is idempotent and cannot overwrite world numbers',async t=>
 });
 test('confirmed local action queues one scene candidate; duplicate does not enqueue twice',t=>{
  const old=process.env.AGENT_ALLOW_API_GENERATION;process.env.AGENT_ALLOW_API_GENERATION='true';t.after(()=>{if(old===undefined)delete process.env.AGENT_ALLOW_API_GENERATION;else process.env.AGENT_ALLOW_API_GENERATION=old});
- const {store,id,worlds}=setup(t),cmd={commandId:'march',expectedRevision:0,armyId:'army-wei-yan',kind:'march',targetCityId:'changan'};
+ const {store,id,worlds}=setup(t),cmd={commandId:'march',expectedRevision:worlds.getWorld(id).revision,armyId:'army-wei-yan',kind:'march',targetCityId:'changan'};
  worlds.localOrder(id,cmd);worlds.localOrder(id,cmd);
  const jobs=store.jobs(id).filter(j=>j.subjectId==='world-march');assert.equal(jobs.length,1);assert.equal(jobs[0].majorCandidate,true);assert.equal(jobs[0].input.event.confirmed,true);
 });

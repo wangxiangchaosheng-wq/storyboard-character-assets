@@ -3,12 +3,26 @@ import {parseTopic} from './topic-contract.js';
 import {Store,hash} from './store.js';
 import {AgentError,assert,parseSpec,type Message,type Run,type Settlement} from './contracts.js';
 export type EngineState={gameId:string;turn:number;state:Record<string,number>;chat:Message[];spec:unknown};
+/**
+ * SIM_ENGINE_URL is operator config, not user input, so it is exempt from the safeFetch host policy that
+ * guards user-supplied URLs. It still gets the protocol/host checks below: plaintext is permitted only to
+ * this machine, because a remote or LAN endpoint would put the payload on a network we do not control.
+ */
+export function engineBase(env:NodeJS.ProcessEnv=process.env):string {
+ const raw=env.SIM_ENGINE_URL;assert(raw,'请先配置队友推演服务的 SIM_ENGINE_URL；可先导入剧本测试四个模块',503);
+ let url:URL;try{url=new URL(raw);}catch{throw new AgentError('推演服务地址格式不正确',503);}
+ if(url.protocol!=='https:'&&url.protocol!=='http:')throw new AgentError('推演服务地址必须使用 HTTP 或 HTTPS',503);
+ if(url.username||url.password||url.search||url.hash)throw new AgentError('推演服务地址不能包含账号信息或查询参数',503);
+ const loopback=/^(127\.\d+\.\d+\.\d+|localhost|\[::1\]|::1)$/.test(url.hostname);
+ if(url.protocol==='http:'&&!loopback)throw new AgentError('推演服务使用明文 HTTP 时仅允许指向本机地址',503);
+ if(!loopback&&/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/.test(url.hostname))throw new AgentError('推演服务地址不允许指向私有或保留网段',503);
+ return url.toString().replace(/\/$/,'');
+}
 export class EngineBridge {
   store:Store;busy=new Set<string>();constructor(store:Store){this.store=store;}
   async request(path:string,body?:unknown):Promise<unknown>{
-    const base=process.env.SIM_ENGINE_URL;assert(base,'请先配置队友推演服务的 SIM_ENGINE_URL；可先导入剧本测试四个模块',503);
-    assert(/^https?:\/\//.test(base),'推演服务地址无效',503);
-    let res:Response;try{res=await fetch(base.replace(/\/$/,'')+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(240000),redirect:'error'});}catch{throw new AgentError('推演服务连接中断，执行结果可能已保存，请先同步状态',502);}
+    const base=engineBase();
+    let res:Response;try{res=await fetch(base+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(240000),redirect:'error'});}catch{throw new AgentError('推演服务连接中断，执行结果可能已保存，请先同步状态',502);}
     if(!res.ok)throw new AgentError(`推演服务返回 ${res.status}，请检查服务运行情况`,502);return res.json();
   }
   /** Import research once; local world rules remain the only settlement owner. */

@@ -1,6 +1,12 @@
 import {validateSimulation} from './simulation-state.js';
 import {AgentError, assert} from './contracts.js';
-import type {Action, Army, ArmyLocation, City, Decision, EntityRef, FieldChange, JsonValue, Mutation, Point, SettlementInput, WorldEvent, WorldSnapshot} from './world-contracts.js';
+import type {Action, Army, ArmyLocation, City, Decision, DiplomaticState, EntityRef, FieldChange, FiscalState, JsonValue, Mutation, Point, Province, PoliticalState, SettlementInput, WorldEvent, WorldSnapshot} from './world-contracts.js';
+import {validateProvinces,PROVINCE_MODES} from './province.js';
+import {validatePolitics} from './politics.js';
+import {validateDiplomacy} from './diplomacy.js';
+import {validateFiscal} from './treasury.js';
+import {validateFocusState} from './focuses.js';
+import {TECH_CATEGORIES,MAX_ACTIVE_TECHS,type TechState} from './techs.js';
 
 const forbidden = new Set(['__proto__', 'constructor', 'prototype']);
 const object = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -31,6 +37,15 @@ function city(x: unknown): asserts x is City {
   oneOf(x.kind, ['city', 'pass'], '城池类型'); if (x.governor !== null) person(x.governor);
   number(x.foodKg, '城池库存'); number(x.defense, '城防', 0, 100);
 }
+function province(x: unknown): asserts x is Province {
+  record(x, '省'); identifier(x.id); text(x.name, '省名', 100); identifier(x.seatCityId); identifier(x.ownerFactionId);
+  oneOf(x.mode, PROVINCE_MODES, '治政模式'); if (x.governor !== null) person(x.governor);
+  if (x.policy !== null) text(x.policy, '年度方针', 2000);
+  assert(Array.isArray(x.memberCityIds) && x.memberCityIds.length <= 50, '属城数量不正确'); x.memberCityIds.forEach(identifier);
+  assert(Array.isArray(x.specialties) && x.specialties.length <= 12, '特产数量不正确'); x.specialties.forEach(v => text(v, '特产', 50));
+  for (const [label, value] of [['农业', x.agriculture], ['商业', x.commerce], ['兵役', x.manpower]] as const) number(value, `${label}底数`, 0, 1e12);
+  text(x.source, '省设定依据', 500);
+}
 function ref(x: unknown): asserts x is EntityRef { record(x, '关联对象'); identifier(x.id); oneOf(x.type, ['army', 'city', 'action'], '关联对象类型'); }
 function action(x: unknown): asserts x is Action {
   record(x, '行动'); identifier(x.id); identifier(x.decisionId); identifier(x.armyId);
@@ -45,9 +60,82 @@ function decision(x: unknown): asserts x is Decision {
   number(x.issuedDay, '下令日期', 0, Number.MAX_SAFE_INTEGER); oneOf(x.status, decisionStatuses, '决策状态');
   assert(Array.isArray(x.related) && x.related.length <= 200, '关联对象过多或格式不正确'); x.related.forEach(ref);
 }
+/** 决策字典上限。世界快照里的 decisions 只服务于「近期回看」，权威流水是 world_events
+ *  （史官志从中成文，historian.ts 也按事件反查 decisions）。留 500 是硬上限，但在那之前
+ *  就该开始淘汰最旧的例行代决，否则长局会突然全线 400。 */
+const DECISION_HARD_LIMIT = 500;
+const DECISION_SOFT_LIMIT = 400;
+
 function dictionary(x: unknown, label: string, validate: (v: unknown) => void, allIds?: Set<string>) {
-  record(x, label); assert(Object.keys(x).length <= 500, `${label}数量超过500`);
+  record(x, label); assert(Object.keys(x).length <= DECISION_HARD_LIMIT, `${label}数量超过${DECISION_HARD_LIMIT}`);
   for (const [key, value] of Object.entries(x)) { identifier(key); record(value, label); assert(key === value.id, `${label}编号与字典键不一致`); validate(value); if (allIds) { assert(!allIds.has(key), '军队、城池、行动和决策编号不能重复'); allIds.add(key); } }
+}
+
+/**
+ * 决策数逼近上限时淘汰最旧的**已完成例行代决**。
+ *
+ * 为什么必须有：AI 代决（自动补给）每约 2.3 天就记一条决策，实测纯挂机的对局会在
+ * 第 ~1150 天触到 500 硬顶，此后**所有跳转与下令全部 400「决策数量超过500」**——
+ * 对局永久冻结，而玩家事先看不到任何预兆。这等于一局有隐形的三年寿命。
+ *
+ * 淘汰口径（保守，逐条都有理由）：
+ *   - 只淘汰 `status==='completed'`：还在执行中的不能动；
+ *   - 只淘汰自动代决（issuerId 为 ai-marshal / local-defender）：**玩家的战略决策一条不删**，
+ *     他们要在策略库与起居注里回看自己的决断；
+ *   - 按 issuedDay 从旧到新淘汰：先丢最旧的。
+ * 被淘汰的决策并不是历史丢了——它的事件仍在 world_events 里，史官志照旧成文。
+ */
+export function pruneDecisions(world: WorldSnapshot): number {
+  const decisions = (world as unknown as { decisions?: Record<string, unknown> }).decisions;
+  if (!decisions) return 0;
+  // 正在被 action 引用的决策不能删：validateWorld 会断言 action.decisionId 必须在决策簿里
+  // （「行动关联的军队或决策不存在」）。AI 代决的撤退令建了 action，它的 decision 会被
+  // stopOrder 标成 completed，下一轮 prune 就可能误删——那时 action 还活着，直接炸。
+  const referenced = new Set<string>();
+  for (const a of Object.values((world as unknown as { actions?: Record<string, { decisionId?: string }> }).actions ?? {})) {
+    if (a?.decisionId) referenced.add(a.decisionId);
+  }
+  type Entry = { id: string; status: string; issuerId: string; issuedDay: number; title?: string; related?: Array<{ type: string; id: string }> };
+  const entries = Object.values(decisions) as Entry[];
+  if (entries.length <= DECISION_SOFT_LIMIT) return 0;
+  const autoIssuers = new Set(['ai-marshal', 'local-defender']);
+  // 例行补给令是玩家自己下的（「每天把部队喂满」是最自然的玩法），却也是唯一能刷满决策簿的
+  // 东西：每天一条，470 天就撞 500 硬顶，此后**所有**军令抛「决策数量超过500」——整局冻成
+  // 电影。实测 day 522 起一条令都下不去（decisions 500 里 498 条是调拨补给）。
+  // 所以「同一支部队从同一座城调粮」只留最近几条：更早的那些被更新的同一条令取代，
+  // 玩家回看时看最新的就够，旧的纯属噪声。战略库侧由 world_strategy_snapshots 兜底
+  // （strategyMap 见到活决策没了就改读快照表），史官志照旧从 world_events 成文。
+  const routineKey = (d: Entry): string | null => {
+    if (d.issuerId !== 'player' || d.title !== '调拨补给') return null;
+    const army = d.related?.find((r) => r.type === 'army')?.id;
+    const city = d.related?.find((r) => r.type === 'city')?.id;
+    return army && city ? `${army}|${city}` : null;
+  };
+  const keepRoutine = new Set<string>();
+  const newestPerPair = new Map<string, Entry[]>();
+  for (const d of entries) {
+    const key = routineKey(d);
+    if (!key) continue;
+    const list = newestPerPair.get(key) ?? [];
+    list.push(d);
+    newestPerPair.set(key, list);
+  }
+  for (const list of newestPerPair.values()) {
+    for (const d of list.sort((a, b) => b.issuedDay - a.issuedDay).slice(0, 3)) keepRoutine.add(d.id);
+  }
+  const droppable = entries
+    .filter((d) => d.status === 'completed' && !referenced.has(d.id)
+      && (autoIssuers.has(d.issuerId) || (routineKey(d) !== null && !keepRoutine.has(d.id))))
+    .sort((a, b) => a.issuedDay - b.issuedDay);
+  // 只需要降到软上限以下；能淘汰的候选不够时就尽量删（硬上限仍由 validateWorld 兜底）
+  const need = entries.length - DECISION_SOFT_LIMIT;
+  let removed = 0;
+  for (const d of droppable) {
+    if (removed >= need) break;
+    delete decisions[d.id];
+    removed++;
+  }
+  return removed;
 }
 export function validateWorld(raw: unknown): asserts raw is WorldSnapshot {
   record(raw, '世界'); assert(raw.schemaVersion === 'world-state/v1', '不支持的世界格式');
@@ -57,6 +145,20 @@ export function validateWorld(raw: unknown): asserts raw is WorldSnapshot {
   dictionary(raw.factions, '势力', v => { record(v, '势力'); identifier(v.id); text(v.name, '势力名', 100); assert(typeof v.color === 'string' && /^#[a-f\d]{6}$/i.test(v.color), '势力颜色需为六位十六进制'); });
   const ids = new Set<string>();
   dictionary(raw.armies, '军队', army, ids); dictionary(raw.cities, '城池', city, ids); dictionary(raw.actions, '行动', action, ids); dictionary(raw.decisions, '决策', decision, ids);
+  if (raw.provinces !== undefined) { dictionary(raw.provinces, '省', province); validateProvinces(raw as unknown as WorldSnapshot); }
+  // 剧本题目的终局条件：可选（旧存档没有），有就必须自洽，否则终局判定会被脏数据带偏
+  if (raw.scenarioGoal !== undefined) {
+    const g = raw.scenarioGoal as { years?: unknown; premise?: unknown };
+    record(g, '剧本目标');
+    assert(typeof g.years === 'number' && Number.isFinite(g.years) && g.years > 0 && g.years <= 1000, '剧本目标年数无效');
+    text(g.premise, '剧本张力', 2000);
+  }
+  if (raw.politics !== undefined) { record(raw.politics, '朝政'); validatePolitics(raw.politics as unknown as PoliticalState); }
+  if (raw.diplomacy !== undefined) { record(raw.diplomacy, '外交'); validateDiplomacy(raw.diplomacy as unknown as DiplomaticState, Object.keys(raw.factions as Record<string,unknown>)); }
+  if (raw.fiscal !== undefined) { record(raw.fiscal, '国库'); validateFiscal(raw.fiscal as unknown as FiscalState); }
+  if (raw.focuses !== undefined) { record(raw.focuses, '国策'); validateFocusState(raw.focuses); }
+  if (raw.techs !== undefined) { record(raw.techs, '科技'); validateTechState(raw.techs as unknown as TechState); }
+  validateInTransit(raw);
   const w = raw as unknown as WorldSnapshot, day = w.clock.elapsedDays;
   const same = (a: Point, b: Point) => Math.abs(a.x - b.x) < 1e-8 && Math.abs(a.y - b.y) < 1e-8;
   const active = new Set<string>();
@@ -174,4 +276,96 @@ export function reduceWorld(before: WorldSnapshot, input: SettlementInput): {wor
   for (const r of [...related.values()]) if (r.type === 'action') { const a=world.actions[r.id]; related.set('army'+a.armyId,{type:'army',id:a.armyId}); for (const e of [a.origin,a.target]) if(e.cityId) related.set('city'+e.cityId,{type:'city',id:e.cityId}); }
   if (input.elapsedDays) changes.push({entity:{type:'clock',id:world.worldId},field:'elapsedDays',before:before.clock.elapsedDays,after:world.clock.elapsedDays,unit:'日',reason:'上游确认推进时间'});
   return {world,event:{id:input.settlementId,worldId:world.worldId,settlementId:input.settlementId,decisionId:input.decisionId,revision:world.revision,fromDay:before.clock.elapsedDays,toDay:world.clock.elapsedDays,source:input.source,title:input.title,summary:input.summary,related:[...related.values()],changes}};
+}
+
+/** 终局判定 v0：仅按城池归属。州郡规模的胜负要等派系/国策系统上线后再扩展，这里先让一局能结束。 */
+/** 终局判定的返回值。`reason` 说明是哪条判据促成的，收尾呈现与测试都要用它。 */
+export interface WorldVerdict{over:boolean;outcome:'victory'|'defeat'|null;summary:string;reason:VerdictReason}
+/** 判据优先级从高到低：覆灭 > 统一 > 剧本年限。旧的「未终局」返回 over:false 且 reason:'ongoing'。 */
+export type VerdictReason='ongoing'|'annihilated'|'unified'|'scenario-complete'
+/** 剧本建议年数换算成天数。与 economy.ts 的 DAYS_PER_YEAR 同口径（365），避免两边漂移。 */
+const DAYS_PER_YEAR=365;
+export function worldVerdict(w:WorldSnapshot):WorldVerdict{
+ const factions=[...new Set(Object.values(w.cities).map(c=>c.ownerFactionId))];
+ const player=w.simulation?.playerFactionId;
+ const total=Object.keys(w.cities).length;
+ const mine=player?Object.values(w.cities).filter(c=>c.ownerFactionId===player).length:0;
+ // 剧本终局只对「声明了目标的剧本」生效：scenarioVerdict 早就以 scenarioGoal 为前提，
+ // 胜负线同属剧本契约，手搓世界与旧存档不受这两条提前收尾影响。
+ const scripted=!!w.scenarioGoal;
+ // 尽失州郡不必等剧本年限：家底没了就没有下一步可走，立刻收尾。
+ if(scripted&&player&&total>0&&mine===0)return{over:true,outcome:'defeat',summary:'尽失州郡，社稷倾覆',reason:'annihilated'};
+ // 城池过半即战略已定，不必空转到年限才看到结局：一条打得通的北伐线约四个月就能过半，
+ // 却要玩家再挂机九年才结算——收尾必须跟着形势走。剧本上限留给「师老无功」那条线。
+ if(scripted&&player&&total>0&&mine*2>=total&&factions.length>1)return{over:true,outcome:'victory',summary:`城池过半（${mine}/${total}），北伐之势已成`,reason:'scenario-complete'};
+ // 只剩一个势力时才谈得上统一；多个势力并存时先看剧本年限。
+ if(factions.length>1)return scenarioVerdict(w);
+ if(!player)return{over:false,outcome:null,summary:'',reason:'ongoing'};
+ return{over:true,outcome:'victory',summary:'天下一统，四海归心',reason:'unified'};
+}
+/**
+ * 剧本年限终局：推进到剧本建议年数即收尾，按当时占城多少判胜败。
+ *
+ * 为什么需要：只有「统一/覆灭」两条判据时，本剧本实测三种打法都到不了终局——可扩张方向
+ * 只有一个（汉中→长安）、又没有攻城器械，玩家玩到「推不动」为止，从未见过收尾。按
+ * targetYears 收尾让「一局」有明确边界，玩家的时间和决策才有落点。
+ */
+function scenarioVerdict(w:WorldSnapshot):WorldVerdict{
+ const goal=w.scenarioGoal;
+ if(!goal||!Number.isFinite(goal.years)||goal.years<=0)return{over:false,outcome:null,summary:'',reason:'ongoing'};
+ if(w.clock.elapsedDays<goal.years*DAYS_PER_YEAR)return{over:false,outcome:null,summary:'',reason:'ongoing'};
+ const player=w.simulation?.playerFactionId;
+ const total=Object.keys(w.cities).length;
+ const mine=player?Object.values(w.cities).filter(c=>c.ownerFactionId===player).length:0;
+ const held=total?mine/total:0;
+ // 过半是「守住了这一局争的东西」，不过半是「劳而无功」——都不算输，只是收尾不同。
+ if(held>=.5)return{over:true,outcome:'victory',summary:`${goal.years}年之期已满：城池过半，粮道未绝。${goal.premise}`,reason:'scenario-complete'};
+ return{over:true,outcome:'defeat',summary:`${goal.years}年之期已满：所据不足半数，师老无功。${goal.premise}`,reason:'scenario-complete'};
+}
+
+/** 科技层校验：点数界内、清单 4 类分层、前置只指更低层、同时在研不超过两项。 */
+export function validateTechState(raw:unknown):void {
+ if(raw===undefined||raw===null)return;
+ const s=raw as import('./techs.js').TechState;
+ if(!s||typeof s!=='object')throw new AgentError('科技层格式无效',500);
+ if(s.version!==1)throw new AgentError('不支持的科技层版本',500);
+ if(typeof s.points!=='number'||!Number.isFinite(s.points)||s.points<0||s.points>s.pointsCap+1e-9)throw new AgentError('科技点越界',500);
+ if(!Number.isFinite(s.pointsPerDay)||!Number.isFinite(s.pointsCap)||s.pointsPerDay<0||s.pointsCap<1)throw new AgentError('科技点累积参数无效',500);
+ if(!Array.isArray(s.available)||s.available.length>40)throw new AgentError('科技清单无效',500);
+ if(!Array.isArray(s.active)||s.active.length>MAX_ACTIVE_TECHS)throw new AgentError('在研科技过多',500);
+ if(!Array.isArray(s.completed))throw new AgentError('科技完成记录无效',500);
+ const known=new Map(s.available.map(t=>[t.id,t]));
+ for(const t of s.available){
+  if(!TECH_CATEGORIES.includes(t.category))throw new AgentError('科技类别无效',500);
+  if(![1,2,3].includes(t.tier))throw new AgentError('科技分层无效',500);
+  for(const r of t.requires){
+   const pre=known.get(r);
+   if(!pre)throw new AgentError(`前置 ${r} 不在清单内`,500);
+   if(pre.tier>=t.tier)throw new AgentError(`前置 ${pre.title} 不低于 ${t.title} 一层`,500);
+  }
+ }
+ for(const a of s.active){
+  if(typeof a.techId!=='string'||!Number.isFinite(a.startedDay)||!Number.isFinite(a.endsDay))throw new AgentError('在研科技格式无效',500);
+  if(a.endsDay<a.startedDay)throw new AgentError('科技完成日早于立项日',500);
+ }
+}
+
+/** 在途层校验：驿报与诏令的到达日都不能早于发生日/下发日，否则「未发先至」。 */
+export function validateInTransit(raw:unknown):void{
+ if(raw===undefined||raw===null)return;
+ const w=raw as {incomingEvents?:unknown[];pendingEdicts?:unknown[]};
+ if(w.incomingEvents!==undefined){
+  for(const e of w.incomingEvents as import('./courier.js').IncomingEvent[]){
+   if(typeof e.eventId!=='string'||!Number.isFinite(e.happenedDay)||!Number.isFinite(e.arrivalDay))throw new AgentError('在途驿报格式无效',500);
+   if(e.arrivalDay<e.happenedDay)throw new AgentError('驿报早于事发之日',500);
+   if(e.kind!=='decision'&&e.kind!=='news')throw new AgentError('驿报类别无效',500);
+  }
+ }
+ if(w.pendingEdicts!==undefined){
+  for(const e of w.pendingEdicts as import('./courier.js').PendingEdict[]){
+   if(typeof e.id!=='string'||typeof e.armyId!=='string'||typeof e.kind!=='string')throw new AgentError('在途诏令格式无效',500);
+   if(!Number.isFinite(e.issuedDay)||!Number.isFinite(e.arrivalDay))throw new AgentError('在途诏令日期无效',500);
+   if(e.arrivalDay<e.issuedDay)throw new AgentError('诏令早于下发之日',500);
+  }
+ }
 }

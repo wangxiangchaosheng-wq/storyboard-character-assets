@@ -5,12 +5,22 @@ export function localProfile():RulesProfile {
  return {id:'hanzhong-local-v1',version:1,status:'experimental',sources:[
   {url:'https://ctext.org/text.pl?if=gb&node=603669&remap=gb',note:'魏延传裴注：子午谷方案是提案，十日不是实测行军速度；负粮五千不作为公斤数。'},
   {url:'https://ctext.org/text.pl?if=gb&node=602731&show=parallel',note:'张郃传：取水通道影响战局；未提供本模型的伤亡或口粮系数。'}],parameters:{
-  marchKmDay:p(20,15,25,'km/day','审核稿基础速度；道路与负重另计'),
+  // 25 而不是 20：汉中↔长安 240km 且 terrainFactor 0.75，20 意味着基础路速只有 15km/日、
+  // transit 约 28 天、需粮 ~168t，而魏延部携粮上限是 120t（见 simulation-state 的 capacityKg）
+  // ——数量级差距，奇袭流算术上无解。25 后基础路速 18.75km/日、transit 约 16.7 天、
+  // 需粮约 100t，落在「困难但可行」那档。区间本来就是 [15,25]，不需要放宽边界，
+  // 旧存档照样加载。
+  marchKmDay:p(25,15,25,'km/day','审核稿基础速度；道路与负重另计'),
   forcedFactor:p(1.3,1.15,1.4,'倍','审核稿急行军倍率'),
-  fatigueSpeed:p(.005,.003,.007,'每疲劳点','审核稿疲劳速度折减'),
+  // .003 而不是 .005：.005 会让疲劳因子在约第 10 天触底 .5，即便路速提到 25 也走不完全程。
+  // .003 下第 16 天仍有 0.71，保证 transit 完成。区间本来就是 [.003,.007]。
+  fatigueSpeed:p(.003,.003,.007,'每疲劳点','审核稿疲劳速度折减'),
   fatigueMarch:p(8,6,10,'点/day','审核稿普通行军疲劳'),
   fatigueForced:p(18,15,22,'点/day','审核稿急行军疲劳'),
   fatigueRest:p(15,10,18,'点/day','审核稿充分补给休整恢复'),
+ // 士气原先只减不增：一战之后归零，此后战斗效能腰斩、任何接触都触发「士气过低」暂停，
+ // 一局余下时间再也翻不了身。休整恢复让「打下来→驻屯整备→再出击」成为可执行的循环。
+ moraleRest:p(1.5,.5,3,'点/day','驻屯休整、补给充足的士气恢复'),
   forcedLimit:p(70,60,80,'点','审核稿急行军上限'),
   rationKg:p(1,.8,1.2,'kg/person/day','粮食当量；非史料定额'),
   waterLitres:p(4,3,6,'L/person/day','供水游戏抽象，非医学或历史定额'),

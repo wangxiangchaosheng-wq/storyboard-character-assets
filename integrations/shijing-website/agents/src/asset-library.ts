@@ -1,5 +1,5 @@
 import {mkdirSync,readdirSync,readFileSync,writeFileSync,renameSync,existsSync} from 'node:fs';
-import {resolve} from 'node:path';
+import {resolve,sep} from 'node:path';
 import {createHash} from 'node:crypto';
 import sharp from 'sharp';
 import {assert,type Persona,type Job} from './contracts.js';
@@ -18,7 +18,11 @@ export class AssetLibrary {
   }
   async find(persona:Persona){
     const name=normalize(persona.name);const entry=this.entries().find(e=>normalize(e.name)===name||e.aliases?.some(a=>normalize(a)===name));if(!entry)return;
-    const path=resolve(this.directory,entry.file);assert(path.startsWith(this.directory+'/'),'素材路径不能越出人物素材库',503);
+    // 防穿越：拼出的路径必须仍在库目录内。分隔符必须用 sep——resolve() 在 win32 返回反斜杠
+    // 路径，写死 '/' 会让 startsWith 恒为 false，于是**每个人物立绘都取不到**（打包态全失败，
+    // 报「素材路径不能越出人物素材库」这种和真实原因无关的错）。这条自 2026-09-12 起就在。
+    const path=resolve(this.directory,entry.file);
+    assert(path.startsWith(this.directory+sep)||path===this.directory,'素材路径不能越出人物素材库',503);
     const png=readFileSync(path);const meta=await sharp(png,{limitInputPixels:16000000}).metadata();assert(meta.format==='png'&&meta.hasAlpha,`人物库里的「${entry.name}」需要带透明通道的 PNG`,503);
     const {data,info}=await sharp(png).ensureAlpha().raw().toBuffer({resolveWithObject:true});let clear=0,visible=0;for(let i=3;i<data.length;i+=4){if(data[i]<10)clear++;if(data[i]>128)visible++;}
     assert(clear/(info.width*info.height)>0.15&&visible/(info.width*info.height)>0.1,`人物库里的「${entry.name}」不是有效免抠图`,503);

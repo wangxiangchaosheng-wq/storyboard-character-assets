@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import LocaleLangSync from './components/LocaleLangSync';
+import { DEFAULT_LOCALE } from './lib/i18n';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
@@ -22,8 +24,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN">
-      <body>{children}</body>
+    // SSR 快照固定为 DEFAULT_LOCALE（服务端读不到本机存储）；挂载后
+    // LocaleLangSync 按玩家选择改成 zh-CN / en——首屏与水合快照一致，无偏差。
+    <html lang={DEFAULT_LOCALE}>
+      <body>{children}<LocaleLangSync/></body>
     </html>
   );
 }
