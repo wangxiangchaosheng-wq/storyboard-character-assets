@@ -18,16 +18,67 @@ function arrowShape(from:{x:number;y:number},to:{x:number;y:number}){
  for(let i=24;i>=0;i--){const t=headT*i/24;points.push(side(t,-4-(tail-4)*(1-t/headT)**2));}
  return 'M'+points.join(' L')+' Z';
 }
-function MarkerStrategyScreen({data,onClose,toolbar,artwork="/strategy/map-world.svg",onDecide,busy,onAdoptFocus,onAdoptTech,onDecideWhatIf,onProvinceUpdate}:{data:StrategyData;onClose:()=>void;toolbar?:(close:()=>void)=>ReactNode;artwork?:string;onDecide?:(choiceId:string)=>void;busy?:boolean;onAdoptFocus?:(focusId:string)=>void;onAdoptTech?:(techId:string)=>void;onDecideWhatIf?:(cardId:string,choiceId:string)=>void;onProvinceUpdate?:(provinceId:string,patch:{governorName?:string;mode?:string;policy?:string})=>void}){
+function MarkerStrategyScreen({data,onClose,toolbar,artwork="/strategy/map-world.svg",onDecide,busy,onAdoptFocus,onAdoptTech,onDecideWhatIf,onProvinceUpdate,inline}:{data:StrategyData;onClose:()=>void;toolbar?:(close:()=>void)=>ReactNode;artwork?:string;onDecide?:(choiceId:string)=>void;busy?:boolean;onAdoptFocus?:(focusId:string)=>void;onAdoptTech?:(techId:string)=>void;onDecideWhatIf?:(cardId:string,choiceId:string)=>void;onProvinceUpdate?:(provinceId:string,patch:{governorName?:string;mode?:string;policy?:string})=>void;inline?:boolean}){
+ /**
+  * 主底图用**预合成的整幅 map-canvas.png**（1725×863：纸色底 + 地形窗口一次烤平），
+  * 不用 map-world.svg，也不用世界地形 PNG + CSS 偏移。
+  *
+  * 踩过的坑（本轮逐个实测）：
+  * ① map-world.svg 直接用 —— SVG 作为 <img> 被缩放时，内部那张外链 terrain 只画出中间
+  *    一条窄带，整幅其余部分是空白（引擎对「缩放 SVG 内嵌外链图」的处理缺陷）；
+  * ② terrain PNG 内联成 data URI —— 1.5MB data URI 直接加载失败；
+  * ③ terrain PNG + CSS inset 偏移到舆图窗口 —— 盒子几何完全正确，但带 left/top 偏移的
+  *    大图在这个渲染器里同样只画一条（GPU 合成怪癖）。
+  * 所以把纸色与地形按 SVG 注释里的同一套坐标（窗口 x∈[436,1608]、y∈[143,805]）
+  * 预合成一张整幅 PNG，<img> 回到 0,0 满幅——以上三条全部绕开，城池点位分毫不差。
+  * 生成方式见 scripts/make-map-canvas.mjs（改底图或换坐标必须重跑）。
+  */
+ /**
+  * 底图用**内联 SVG**（纸色 rect + 地形窗口），不用 <img src="*.svg">。
+  *
+  * 踩过的坑（本轮逐个实测，全在本机渲染器复现）：
+  * ① <img src="map-world.svg"> 缩放后只画中间一条窄带——引擎对「img 里的缩放 SVG 内嵌
+  *    外链图」处理有缺陷；导航到 SVG 本身看却完全正常；
+  * ② 外链图改 data URI 内联 → 1.5MB data URI 直接加载失败；
+  * ③ 预合成整幅 PNG + CSS inset 偏移 → 盒子几何全对，仍只画一条；
+  * ④ 整幅 PNG 回到 0,0 满幅 → 还是只画一条（首绘缺陷，几秒后才自愈）；
+  * ⑤ 换 JPEG / 换 CSS background-image → 同样只画一条。
+  * 而叠在上面的对象 SVG 里 `<image href="/strategy/icon-9.png">` 一直都画得好好——
+  * 说明「活 SVG 里嵌外链图」这条路是通的。所以底图回归 SVG 本体，只是从 img 改成内联。
+  * 坐标与 map-world.svg 注释逐字一致（窗口 x∈[436,1608]、y∈[143,805]），城池点位不跑。
+  */
  const [ready,setReady]=useState(false);
- const artRef=useRef<HTMLImageElement>(null);
+ // 地形图「挂载后再插入」：本机渲染器对**首屏那一次绘制**里的大图有缺陷（只画中间一条
+ // 窄带，几秒后才自愈）；而同一个元素在页面加载完成后再插进 DOM，每次都画得完完整整
+ // （实测反复验证）。所以这里先只画纸色 rect，下一拍再把 terrain image 挂上去——
+ // 用一拍的纸底换一张完整的地图，值。用 setTimeout 而非 rAF：IAB 后台标签页会挂起 rAF。
+ const [terrainIn,setTerrainIn]=useState(false);
+ // 400ms：必须落在**首屏那次绘制之后**。0ms/一帧都试过，仍踩在首绘窗口里（实测还是窄带）；
+ // 首绘前的纸底由 rect 先顶着，玩家看到的是纸→地图淡入，不是坏图。
+ useEffect(()=>{const id=setTimeout(()=>setTerrainIn(true),400);return()=>clearTimeout(id);},[]);
+ const [painted,setPainted]=useState(false);
+ /**
+  * 地形图解码完成后再强制一次绘制失效。
+  *
+  * 本机渲染器的缺陷链（本轮逐个实测）：大图/内联 SVG 在**首屏那次绘制**里只画中间一条
+  * 窄带，要等几秒才自愈；而任何一次事后样式失效（改属性、appendChild、改 opacity）都会
+  * 让它立刻整幅上场。所以地形图 onLoad 后补一次 opacity 抖动——改完再改回来，值不变、
+  * 但浏览器必须重新合成这一层。这不是优化，是补渲染缺陷。
+  */
+ function nudgePaint(){const svg=artRef.current;if(!svg)return;svg.style.opacity='0.999';requestAnimationFrame(()=>{svg.style.opacity='';});}
+ // 首绘那次坏画在任何一次样式失效后就会重画对（实测反复验证），但「什么时候坏画」不稳定：
+ // 于是在加载后的几个时间点各推一掌，总有一掌落在坏画之后。配合下方帘子，玩家看不到窄带。
+ useEffect(()=>{const ids=[500,1200,2500].map(ms=>setTimeout(nudgePaint,ms));return()=>ids.forEach(clearTimeout);},[]);
+ const artRef=useRef<SVGSVGElement>(null);
  const progress=useRef(0);
  // Cached images can finish before React attaches onLoad during hydration.
- useEffect(()=>{let cancelled=false;const image=artRef.current;const finish=()=>{if(!cancelled)setReady(true);};if(image?.complete)finish();else if(image){image.addEventListener('load',finish);image.addEventListener('error',finish);}
- return()=>{cancelled=true;image?.removeEventListener('load',finish);image?.removeEventListener('error',finish);};},[artwork]);
- const [p,setP]=useState(0),[closing,setClosing]=useState(false),[selected,setSelected]=useState(''),[decision,setDecision]=useState(data.focusDecisionId||'');const close=useRef(onClose);close.current=onClose;
- useEffect(()=>{if(!ready&&!closing)return;let frame=0,start:number|undefined;const initial=progress.current;const duration=matchMedia('(prefers-reduced-motion: reduce)').matches?1:closing?1100:3000;function tick(t:number){start??=t;const elapsed=t-start;const v=Math.min(1,Math.max(0,elapsed-(closing?0:300))/duration),ease=v*v*(3-2*v);const next=closing?initial*(1-ease):initial+(1-initial)*ease;progress.current=next;setP(next);if(v<1)frame=requestAnimationFrame(tick);else if(closing)close.current();}frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame);},[closing,ready]);
- useEffect(()=>{const before=document.activeElement as HTMLElement;const old=document.body.style.overflow;document.body.style.overflow='hidden';const key=(e:KeyboardEvent)=>{if(e.key==='Escape')setClosing(true);};addEventListener('keydown',key);return()=>{document.body.style.overflow=old;removeEventListener('keydown',key);before?.focus();};},[]);
+ // 帘子兜底：地形图的 onLoad 会揭开它；万一一格电都没来（缓存边角情况），1.2s 后也强制揭开，
+ // 绝不把玩家关在帘子外头。SVG 元素没有 complete 属性，故不用挂载时探测。
+ useEffect(()=>{const t=setTimeout(()=>setPainted(true),1200);return()=>clearTimeout(t);},[]);
+ const [p,setP]=useState(inline?1:0),[closing,setClosing]=useState(false),[selected,setSelected]=useState(''),[decision,setDecision]=useState(data.focusDecisionId||'');const close=useRef(onClose);close.current=onClose;
+ useEffect(()=>{if(!ready&&!closing)return;let frame=0,start:number|undefined;const initial=progress.current;const duration=inline||matchMedia('(prefers-reduced-motion: reduce)').matches?1:closing?1100:3000;function tick(t:number){start??=t;const elapsed=t-start;const v=Math.min(1,Math.max(0,elapsed-(closing?0:300))/duration),ease=v*v*(3-2*v);const next=closing?initial*(1-ease):initial+(1-initial)*ease;progress.current=next;setP(next);if(v<1)frame=requestAnimationFrame(tick);else if(closing)close.current();}frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame);},[closing,ready,inline]);
+ // inline（地图主页）不是弹层：没有「确认并收卷」，Esc 也不该关掉整个世界
+ useEffect(()=>{if(inline)return;const before=document.activeElement as HTMLElement;const old=document.body.style.overflow;document.body.style.overflow='hidden';const key=(e:KeyboardEvent)=>{if(e.key==='Escape')setClosing(true);};addEventListener('keydown',key);return()=>{document.body.style.overflow=old;removeEventListener('keydown',key);before?.focus();};},[inline]);
  useEffect(()=>{setDecision(data.focusDecisionId||'');setSelected('');},[data.focusDecisionId]);
  const high=linkedObjects(data,decision);const army=data.armies.find(a=>a.id===selected),city=data.cities.find(a=>a.id===selected),action=data.actions.find(a=>a.id===selected),order=data.decisions.find(a=>a.id===(action?.decisionId||selected));const activeArmy=army||data.armies.find(a=>a.id===action?.armyId);const name=(id:string)=>data.cities.find(c=>c.id===id)?.name||data.armies.find(a=>a.id===id)?.name||id;
  // UX-005：详情面板不再给玩家看内部编号（ID: army-wei-yan 这类是调试字段）；数据来源说明
@@ -48,8 +99,17 @@ function MarkerStrategyScreen({data,onClose,toolbar,artwork="/strategy/map-world
  const popupTop=Math.max(3,Math.min(48,(anchor.y-40)/863*100-5));
  const history=data.changes.filter(c=>selected&&((army||city)&&data.ready?c.entityId===selected:(c.objects.includes(selected)||c.decisionId===(action?.decisionId||selected))));
  const pending=data.pendingDecision;
-   return <div className={toolbar?"strategy-overlay strategy-gallery-overlay":"strategy-overlay"} role="dialog" aria-modal="true" aria-label="议题战略地图" onKeyDown={e=>{if(e.key!=='Tab')return;const nodes=Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),[tabindex="0"]'));const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}}>{toolbar?toolbar(()=>setClosing(true)):<button className="strategy-close-original" onClick={()=>setClosing(true)} aria-label="确认并收卷">×</button>}<div className="strategy-scroll"><div className="strategy-paper" style={{clipPath:`inset(0 ${(1-p)*50}%)`,pointerEvents:p===1?'auto':'none'}}><img ref={artRef} className="strategy-art" src={artwork} onLoad={()=>setReady(true)} onError={()=>setReady(true)} alt="三国战略地图"/><button className="strategy-original-decision" aria-label="查看决策并高亮相关对象" onClick={()=>{const d=cardDecision;if(d){setDecision(d.id);setSelected(d.id);}}}/>
+   return <div className={inline?"strategy-overlay strategy-inline":toolbar?"strategy-overlay strategy-gallery-overlay":"strategy-overlay"} role={inline?undefined:"dialog"} aria-modal={inline?undefined:"true"} aria-label="议题战略地图" onKeyDown={e=>{if(e.key!=='Tab')return;const nodes=Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),[tabindex="0"]'));const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}}>{inline?null:toolbar?toolbar(()=>setClosing(true)):<button className="strategy-close-original" onClick={()=>setClosing(true)} aria-label="确认并收卷">×</button>}<div className="strategy-scroll">{/* paper 的 clip-path 只在展开动画进行中挂；**静止态必须摘掉**——本机渲染器里
+    带着 clip-path 的 <img> 只画中间一条窄带（整幅地图「缩成一条线」，实测去掉即恢复），
+    而地图主页这一态是常驻的，绝不能让底图带病上场。 */}
+{/* 帘子：坏画→重画对要一两秒，那期间先不显（纸色 rect 顶着），painted 后淡入。 */}
+<div className="strategy-paper" style={{opacity:painted?1:0,transition:'opacity .3s ease',clipPath:p===1?undefined:`inset(0 ${(1-p)*50}%)`,pointerEvents:p===1?'auto':'none'}}><button className="strategy-original-decision" aria-label="查看决策并高亮相关对象" onClick={()=>{const d=cardDecision;if(d){setDecision(d.id);setSelected(d.id);}}}/>
+{/* 底图并进**对象层**这张 SVG（它首屏每次都画得完完整整——城池图标、箭头、文字都在）。
+    单独一张 .strategy-art SVG 放底图，本机渲染器首绘只画中间一条（rect 都只画一条，
+    实测换到对象层里即完整）；所以底图不做独立图层，与对象同图，绘制顺序即层级顺序。
+    地形仍「挂载后插入」：避免和首绘那次坏画撞上。 */}
 <svg className="strategy-objects" viewBox="0 0 1725 863">
+<rect width="1725" height="863" fill="#eee7db"/>{terrainIn&&<image href="/strategy/world-terrain.png" x="436" y="143" width="1172" height="662" preserveAspectRatio="none" onLoad={()=>{setReady(true);setPainted(true);}} onError={()=>{setReady(true);setPainted(true);}}/>}
 <g style={{pointerEvents:'none',fontFamily:'Songti SC,serif',fill:'#30291c'}} aria-label="当前决策与资源">
 <text x="128" y="274" fontSize="18">{(cardDecision?.title||'初始部署').slice(0,10)}</text>
 <text x="300" y="273" fontSize="14">{cardTime}</text>
@@ -71,9 +131,12 @@ function MarkerStrategyScreen({data,onClose,toolbar,artwork="/strategy/map-world
    {/* 脑洞决策：军议从当前局势读出的「如果…」。玩家不懂这段史时，替他问出下一步能怎么走。
       这是**可选**的岔路不是史实——定下了照付代价，起居注里明写「非常之谋」。 */}
    {data.whatIfs?.map(card=><WhatIfCard key={card.id} card={card} busy={busy} onDecide={(choiceId)=>onDecideWhatIf&&onDecideWhatIf(card.id,choiceId)}/>)}
-   {data.focuses?<FocusPanel focuses={data.focuses} busy={busy} onAdopt={id=>onAdoptFocus&&onAdoptFocus(id)}/>:null}
-   {data.techs?<TechPanel techs={data.techs} busy={busy} onAdopt={id=>onAdoptTech&&onAdoptTech(id)}/>:null}
+   {/* inline（地图主页）把两棵树交给侧轨抽屉：地图右侧只留真正拦路的待决卡与脑洞岔路，
+       否则两张几百像素高的树常驻在图右，图上可点的城与军被挤到边缘（P 社那套是
+       树从图标轨进，不从地图上进）。弹层模式（廷议页的虎符）维持原样。 */}
+   {!inline&&data.focuses?<FocusPanel focuses={data.focuses} busy={busy} onAdopt={id=>onAdoptFocus&&onAdoptFocus(id)}/>:null}
+   {!inline&&data.techs?<TechPanel techs={data.techs} busy={busy} onAdopt={id=>onAdoptTech&&onAdoptTech(id)}/>:null}
   </div>{selected&&<section className="strategy-details" style={{left:`${popupLeft}%`,top:`${popupTop}%`,right:'auto'}} role="region" aria-label="对象详情"><button aria-label="关闭详情" onClick={()=>setSelected('')}>×</button><h3>{army?'军队':city?'城池':action?'行动':'决策'}详情</h3><dl>{Object.entries(fields).map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v===undefined||v===null||v===''?'待接入':String(v)}</dd></div>)}</dl>{basisNote&&<details className="strategy-basis"><summary aria-label="数据来源说明">？</summary><p>{basisNote}</p></details>}<h4>状态变化历史</h4>{history.length?history.map((h,i)=><article key={i}><p>{h.time} · 决策 {h.decisionId}</p><p>对象：{h.objects.map(name).join('、')}</p><p>{h.before} → {h.after}</p><p>原因：{h.reason}</p></article>):<p>暂无变化记录</p>}</section>}</div>{['left','right'].map(side=><svg key={side} className={'strategy-roller '+side} style={{[side]:`${(1-p)*(50-75/1725*100)}%`,opacity:p===1?0:1}} viewBox={side==='left'?'0 0 75 863':'1650 0 75 863'} aria-hidden="true"><image href={artwork} width="1725" height="863"/></svg>)}</div></div>;
 }
 
-export default function StrategyScreen(props:{data:StrategyData;onClose:()=>void;toolbar?:(close:()=>void)=>ReactNode;artwork?:string;onDecide?:(choiceId:string)=>void;busy?:boolean;onAdoptFocus?:(focusId:string)=>void;onAdoptTech?:(techId:string)=>void;onDecideWhatIf?:(cardId:string,choiceId:string)=>void;onProvinceUpdate?:(provinceId:string,patch:{governorName?:string;mode?:string;policy?:string})=>void}){return props.toolbar&&!props.data.ready?<StrategyArchiveScreen {...props}/>:<MarkerStrategyScreen {...props}/>;}
+export default function StrategyScreen(props:{data:StrategyData;onClose:() =>void;toolbar?:(close:()=>void)=>ReactNode;artwork?:string;onDecide?:(choiceId:string)=>void;busy?:boolean;onAdoptFocus?:(focusId:string)=>void;onAdoptTech?:(techId:string)=>void;onDecideWhatIf?:(cardId:string,choiceId:string)=>void;onProvinceUpdate?:(provinceId:string,patch:{governorName?:string;mode?:string;policy?:string})=>void;inline?:boolean}){return !props.inline&&props.toolbar&&!props.data.ready?<StrategyArchiveScreen {...props}/>:<MarkerStrategyScreen {...props}/>;}

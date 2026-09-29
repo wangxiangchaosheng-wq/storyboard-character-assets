@@ -13,7 +13,7 @@ import { useLocale, translate as t } from '../lib/i18n';
  * 直接按进一张 iframe 地图里。Steam 客户端负责启动，这一页负责启动之后的事。
  *
  * 三条入口共用同一套底盘：
- * - 开始新局 → 选局面板（剧本 + 难度）→ 建 standalone 对局 → 进 /discussion?run=<id>；
+ * - 开始新局 → 选局面板（剧本 + 难度）→ 建 standalone 对局 → 进 /play?run=<id>（地图主页）；
  * - 继续对局 → GET /runs 列本机既有对局 → 点哪局进哪局；
  * - 调试模式 → /play/debug（AI 分析与运行控制台）。
  *
@@ -67,7 +67,7 @@ export default function LauncherScreen() {
         localStorage.setItem('shijing-scenario-v1', scenarioId);
         localStorage.setItem('shijing-difficulty-v1', difficultyId);
       } catch { /* 隐私模式下存储不可用只影响下次默认值，不挡入场 */ }
-      location.href = '/discussion?run=' + encodeURIComponent(view.id);
+      location.href = '/play?run=' + encodeURIComponent(view.id);
     } catch (e) {
       setStartError(e instanceof Error ? e.message : String(e));
       setStarting(false);
@@ -136,7 +136,7 @@ export default function LauncherScreen() {
           {!runsError && !runs.length && <p className="launcher-runs-empty">{t(locale, 'launcher.continueEmptyBody')}</p>}
           <ul className="launcher-runs-list">
             {runs.map(r => <li key={r.id}>
-              <a href={'/discussion?run=' + encodeURIComponent(r.id)}>
+              <a href={'/play?run=' + encodeURIComponent(r.id)}>
                 <b>{r.title || r.id}</b>
                 <small>
                   {r.createdAt ? new Date(r.createdAt).toLocaleString(locale) : t(locale, 'common.unknown')}
