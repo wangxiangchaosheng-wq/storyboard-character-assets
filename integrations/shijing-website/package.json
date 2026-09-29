@@ -14,6 +14,7 @@
     "agents:build": "tsc -p agents/tsconfig.json && node steam/build.mjs",
     "agents:start": "node --env-file-if-exists=.env agents/dist/main.js",
     "agents:test": "npm run agents:build && node --test agents/tests/*.test.mjs",
+    "test:app": "npm run build && node --test app/lib/*.test.mjs",
     "dev:agents": "node scripts/start-agents.mjs",
     "dev:vinext": "vinext dev --port 3001",
     "dev:web": "vinext dev --port 3002",

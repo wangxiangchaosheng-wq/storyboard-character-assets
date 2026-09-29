@@ -10,6 +10,7 @@ import {seedDiplomacy} from './diplomacy.js';
 import {seedFiscal} from './treasury.js';
 import {HISTORY_ANCHORS} from './anchors.js';
 import {buildFocusState} from './focuses.js';
+import {specSupportsSimulation} from './scenarios.js';
 import {buildTechState} from './techs.js';
 import {fallbackFocuses} from './focus-derive.js';
 import {scenario} from './scenarios.js';
@@ -70,8 +71,9 @@ export function buildInitialWorld(run:Run):InitialWorldInput|null {
  // ② 题目以蜀汉/北伐为玩家方（诸葛亮、魏延、北伐、祁山……）。
  // 官渡（200 年曹袁相争）、赤壁（208 年孙刘对曹）这类议题硬挂上去，玩家会看到魏延替
  // 曹操打仗——它们走无推演的独立模式：人物/故事板/时间线照常，战役推演诚实缺席。
- const compatible=year>=227&&year<=235&&/蜀|汉|北伐|祁山|子午谷|五丈原|诸葛亮|魏延|姜维|蒋琬|费祎|杨仪|赵云|马岱|王平/.test(topic);
- if(!compatible)return buildReadingRoomWorld(run,year);
+ // 判据本体在 scenarios.ts 的 specSupportsSimulation（零依赖叶子函数）：选局面板要在卡面上
+ // 标「可战役推演 / 问对与阅览」，与这里必须是同一份判据，否則标注会和引擎对不上。
+ if(!specSupportsSimulation(run.spec))return buildReadingRoomWorld(run,year);
  const point=(x:number,y:number)=>({x:(x-436)/1172,y:(y-143)/662});
  // 城池坐标就是舆图区（x∈[436,1608]、y∈[143,805]）的像素位，与 public/strategy/map-world.svg
  // 的 world-terrain.png 逐点对齐——底稿换成别的图时这两个数必须一起改，否则城池会浮在水上。

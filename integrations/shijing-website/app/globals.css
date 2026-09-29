@@ -729,3 +729,110 @@ button:disabled{cursor:default}
 .strategy-basis summary{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border:1px solid #b99a63;border-radius:50%;background:#f7efdc;color:#6b5a33;font-size:12px;cursor:pointer;list-style:none}
 .strategy-basis summary::-webkit-details-marker{display:none}
 .strategy-basis p{margin:6px 0 0;color:#6a5a35;font-size:12px;line-height:1.6}
+
+/* ══════════════════════════════════════════════════════════════════
+   启动器（根页面）——史境的门面
+   深色底 + 居中纸面 + 三个入口；配色沿用 ink/paper/cinnabar/gold 四色。
+   ══════════════════════════════════════════════════════════════════ */
+.launcher{background:radial-gradient(circle at 50% 28%,#3a3428 0,#241f16 55%,#14100c 100%);min-height:100svh;display:grid;place-items:center;padding:24px;color:#e8dcc0;font-family:Songti SC,STSong,Noto Serif CJK SC,serif}
+.launcher-frame{background:linear-gradient(#f0e2c2,#e2cfa8);border:1px solid #a47f43;border-radius:10px;box-shadow:0 24px 80px #000a, inset 0 0 60px #d8bf8d55;color:#30291c;width:min(880px,100%);padding:clamp(24px,4vw,48px)}
+.launcher-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.launcher-title{margin:0;font-size:clamp(30px,4.6vw,46px);font-weight:600;letter-spacing:.18em;color:#30291c}
+.launcher-subtitle{margin:6px 0 0;color:#7a6438;font-size:clamp(12px,1.1vw,15px);letter-spacing:.42em}
+.launcher-head-actions{display:flex;align-items:center;gap:10px;flex:none}
+.launcher-map-link{color:#873c2c;border:1px solid #b99a63;border-radius:6px;background:#f7efdc;padding:6px 12px;font-size:13px;text-decoration:none}
+.launcher-map-link:hover{background:#fdf7e8}
+.launcher-tagline{margin:clamp(18px,3vw,30px) 0;color:#6b5a33;font-size:clamp(13px,1.2vw,16px);letter-spacing:.08em;text-align:center}
+.launcher-entries{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+.launcher-entry{display:flex;flex-direction:column;gap:6px;min-height:104px;padding:18px 20px;border:1px solid #b99a63;border-radius:8px;background:#f8f1de;color:#30291c;text-align:left;text-decoration:none;cursor:pointer;transition:transform .16s,box-shadow .16s,background .16s}
+.launcher-entry:hover:not(:disabled){transform:translateY(-2px);background:#fdf7e8;box-shadow:0 10px 28px #20140733}
+.launcher-entry:disabled{opacity:.55;cursor:progress}
+.launcher-entry b{font-size:clamp(17px,1.6vw,21px);font-weight:600;letter-spacing:.08em}
+.launcher-entry small{color:#7a6438;font-size:12.5px;line-height:1.6}
+.launcher-entry-primary{border-color:#873c2c;background:linear-gradient(#fbf3e0,#f3e3c2)}
+.launcher-entry-primary b{color:#873c2c}
+.launcher-foot{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:clamp(18px,3vw,28px);padding-top:14px;border-top:1px dashed #cbb487;font-size:12.5px;color:#6b5a33}
+.launcher-engine{display:inline-flex;align-items:center;gap:7px}
+.launcher-engine i{width:8px;height:8px;border-radius:50%;background:#5c7a3a;box-shadow:0 0 6px #5c7a3a}
+.launcher-engine.is-offline i{background:#a33;box-shadow:0 0 6px #a33}
+.launcher-foot-note{color:#8a7448}
+.launcher-starting,.launcher-start-error{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#2a2418ee;border:1px solid #b99a63;border-radius:8px;padding:10px 18px;font-size:13.5px;color:#f0e2c2;max-width:min(560px,90vw);text-align:center}
+.launcher-start-error{border-color:#c04a3a;color:#ffd9cf}
+/* 续局面板：与选局面板同族的居中纸卡（overlay + inner card） */
+.launcher-runs{position:fixed;inset:0;background:#14100ccc;display:grid;place-items:center;padding:24px;z-index:20}
+.launcher-runs-card{background:#f0e2c2;border:1px solid #a47f43;border-radius:10px;box-shadow:0 24px 80px #000a;color:#30291c;width:min(560px,100%);padding:20px 22px}
+.launcher-runs-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.launcher-runs-head h2{margin:0;font-size:22px;letter-spacing:.08em}
+.launcher-runs-head button{width:30px;height:30px;border:1px solid #b99a63;border-radius:6px;background:#f7efdc;color:#6b5a33;font-size:17px;cursor:pointer}
+.launcher-runs-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto}
+.launcher-runs-list a{display:flex;flex-direction:column;gap:3px;padding:12px 14px;border:1px solid #cbb487;border-radius:6px;background:#f8f1de;color:#30291c;text-decoration:none}
+.launcher-runs-list a:hover{background:#fdf7e8}
+.launcher-runs-list b{font-size:16px;font-weight:600}
+.launcher-runs-list small{color:#7a6438;font-size:12px}
+.launcher-runs-empty,.launcher-runs-error{margin:12px 0;color:#7a6438;font-size:14px;line-height:1.7}
+.launcher-runs-error{color:#873c2c}
+
+/* ══════════════════════════════════════════════════════════════════
+   调试控制台（/play/debug）——看世界、看流水、下令、推进
+   ══════════════════════════════════════════════════════════════════ */
+.debug{background:#171b13;color:#d8cfae;min-height:100svh;font-family:Songti SC,STSong,Noto Serif CJK SC,serif;display:flex;flex-direction:column}
+.debug-head{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid #2c3324;background:#12160f}
+.debug-head h1{margin:0;font-size:19px;font-weight:600;letter-spacing:.1em;color:#e8dcc0}
+.debug-head-actions{margin-left:auto;display:flex;align-items:center;gap:10px}
+.debug-head button{border:1px solid #4a4433;border-radius:6px;background:#222917;color:#cfc39a;padding:6px 12px;font-size:13px;cursor:pointer}
+.debug-head button:hover:not(:disabled){background:#2b3320}
+.debug-head button:disabled{opacity:.5}
+.debug-back{color:#b7a878;text-decoration:none;font-size:13px}
+.debug-back:hover{color:#e8dcc0}
+.debug-picker{display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px;padding:12px 20px;border-bottom:1px solid #2c3324;font-size:13px}
+.debug-picker label{color:#8f8a6d}
+.debug-picker select{background:#222917;border:1px solid #4a4433;border-radius:6px;color:#e8dcc0;padding:7px 10px;font-size:13px;min-width:min(420px,70vw);font-family:inherit}
+.debug-run-meta{color:#b7a878}
+.debug-run-pending{color:#e0a765}
+.debug-tabs{display:flex;gap:0;padding:0 20px;border-bottom:1px solid #2c3324}
+.debug-tabs button{border:0;border-bottom:2px solid transparent;background:0 0;color:#8f8a6d;padding:11px 16px;font-size:14px;cursor:pointer;font-family:inherit;letter-spacing:.06em}
+.debug-tabs button:hover{color:#cfc39a}
+.debug-tabs button.selected{color:#e8dcc0;border-bottom-color:#986d2d}
+.debug section{flex:1;padding:18px 20px 32px;overflow:auto}
+.debug h2{margin:0 0 12px;font-size:15px;font-weight:600;letter-spacing:.1em;color:#cfc39a}
+.debug h3{margin:14px 0 6px;font-size:13.5px;color:#b7a878;font-weight:600}
+.debug-empty{color:#8f8a6d;font-size:14px;padding:28px 20px}
+.debug-world-summary dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:0 0 14px}
+.debug-world-summary div{background:#1d2317;border:1px solid #2f3826;border-radius:6px;padding:9px 12px}
+.debug-world-summary dt{color:#8f8a6d;font-size:11.5px}
+.debug-world-summary dd{margin:3px 0 0;font-size:16px;color:#e8dcc0}
+.debug-raw summary{color:#b7a878;font-size:13px;cursor:pointer;margin-bottom:8px}
+.debug-raw pre,.debug-log{background:#0f130c;border:1px solid #2f3826;border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.6;color:#b7c99a;overflow:auto;max-height:56vh;white-space:pre-wrap;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.debug-log{min-height:180px;margin-top:14px;white-space:pre}
+.debug-event-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.debug-event-list li{background:#1d2317;border:1px solid #2f3826;border-radius:6px;padding:10px 12px}
+.debug-event-list header{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;font-size:12px;color:#8f8a6d}
+.debug-event-list header b{color:#986d2d}
+.debug-event-title{color:#e8dcc0;font-size:13.5px}
+.debug-event-changes{margin-left:auto}
+.debug-event-list p{margin:7px 0 0;font-size:12.5px;line-height:1.7;color:#cfc39a;white-space:pre-wrap}
+.debug-cmd-form{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.debug-cmd-form input{flex:1;min-width:280px;background:#222917;border:1px solid #4a4433;border-radius:6px;color:#e8dcc0;padding:9px 12px;font-size:14px;font-family:inherit}
+.debug-act{display:inline-flex;align-items:center;gap:6px;color:#b7a878;font-size:13px}
+.debug-cmd-form button,.debug-quick button,.debug-run-controls button,.debug-analysis-actions button{border:1px solid #4a4433;border-radius:6px;background:#222917;color:#cfc39a;padding:8px 13px;font-size:13px;cursor:pointer;font-family:inherit}
+.debug-cmd-form button:hover:not(:disabled),.debug-quick button:hover:not(:disabled),.debug-run-controls button:hover:not(:disabled),.debug-analysis-actions button:hover:not(:disabled){background:#2b3320;color:#e8dcc0}
+.debug-cmd-form button:disabled,.debug-quick button:disabled,.debug-run-controls button:disabled,.debug-analysis-actions button:disabled{opacity:.5;cursor:progress}
+.debug-quick,.debug-run-controls,.debug-analysis-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.debug-run-controls b,.debug-analysis-actions b{width:100%;color:#8f8a6d;font-size:12px;font-weight:400;letter-spacing:.1em}
+.debug-analysis-actions a{border:1px solid #986d2d;border-radius:6px;background:#241d10;color:#d8b06a;padding:8px 13px;font-size:13px;text-decoration:none}
+.debug-analysis-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin:0 0 8px}
+.debug-analysis-results div{background:#1d2317;border:1px solid #2f3826;border-radius:6px;padding:9px 12px}
+.debug-analysis-results dt{color:#8f8a6d;font-size:11.5px}
+.debug-analysis-results dd{margin:3px 0 0;font-size:13px;color:#e8dcc0}
+.debug-analysis-block ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.debug-analysis-block li{background:#1d2317;border:1px solid #2f3826;border-radius:999px;padding:5px 12px;font-size:12.5px;color:#cfc39a}
+/* 调试台的语言切换要能在深色底上看见（沿用同款按钮形状，颜色覆盖）。
+   .locale-switch 原本是 absolute 定位（为游戏画面右上角设计的），在启动器/调试台的
+   flex 头部里会飘出流外、压住相邻按钮（实测遮住调试台的「重试」）——这里作用域内改回流内。 */
+.debug .locale-switch,.launcher .locale-switch{position:static;top:auto;right:auto;z-index:auto;box-shadow:none}
+.debug .locale-switch{border-color:#4a4433;background:#222917;color:#cfc39a}
+.debug .locale-switch:hover{background:#2b3320}
+
+/* 选局面板：剧本卡上的推演标注（诚实告知这一局是战役还是问对） */
+.scenario-picker-mode{display:inline-block;margin:0 0 4px;padding:1px 8px;border:1px solid #c0a878;border-radius:999px;background:#f3e9cf;color:#6b5a33;font-size:11px;letter-spacing:.04em}
+.scenario-picker-mode.can-sim{border-color:#5c7a3a;background:#e6ecd8;color:#3d5a24}
