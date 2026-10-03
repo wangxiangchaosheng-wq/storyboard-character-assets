@@ -112,9 +112,14 @@ export default function PlayScreen() {
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
+  // 只依赖 URL 里的 run 参数（读一次存 ref）：切语言不该把整局重拉一遍、轮询计时器归零
+  //（原来 deps 是 [locale]，LocaleSwitch 一切就走 boot + prepare + 重置 2.5s 计时）。
+  const runParam = useRef<string | null>(null);
+  if (runParam.current === null) runParam.current = new URLSearchParams(location.search).get('run');
+  const localeRef = useRef(locale); localeRef.current = locale;
   useEffect(() => {
-    const id = new URLSearchParams(location.search).get('run');
-    if (!id) { setStatus(t(locale, 'play.noRun')); return; }
+    const id = runParam.current;
+    if (!id) { setStatus(t(localeRef.current, 'play.noRun')); return; }
     runId.current = id;
     let alive = true, timer: ReturnType<typeof setTimeout>;
     async function boot() {
@@ -126,7 +131,7 @@ export default function PlayScreen() {
     const tick = () => { void api<View>('runs/' + id).then(v => { if (alive) { setView(v); setError(''); } }).catch(() => { /* 单次失败交给下一次 */ }).finally(() => { if (alive) timer = setTimeout(tick, 2500); }); };
     timer = setTimeout(tick, 2500);
     return () => { alive = false; clearTimeout(timer); };
-  }, [locale]);
+  }, []);
 
   useEffect(() => { log.current?.scrollTo({ top: log.current.scrollHeight, behavior: 'smooth' }); }, [view?.messages.length]);
   // 这一页地图就是主页面——「点虎符摊开舆图」那一步在这里天然完成，直接记掉，
@@ -144,14 +149,17 @@ export default function PlayScreen() {
 
   /** 说话：勾了 act 就是军令，没勾就是问对。与廷议页同一端点。 */
   async function submit() {
-    if (!view || !text.trim() || busy) return;
+    if (!view || busy) return;
+    // 空话拦截：勾了「下达行动」却只说「下达行动/执行/开始」时，原先会打到服务端吃一条裸 400。
+    // 与廷议页同一道门（AgentDiscussion 的正则），两页口径一致。
+    if (!text.trim() || (act && /^(下达行动|执行|开始)[。！!]*$/.test(text.trim()))) { setError(t(locale, 'error.orderEmpty')); return; }
     setBusy(true); setError(''); setNote('');
     const message = text; setText('');
     try {
       const r = await api<View>(`runs/${view.id}/messages`, { commandId: crypto.randomUUID(), text: message, act });
       setView(r);
       if (act) markOnboard('issue-order');
-    } catch (e) { setText(message); setError((e as Error).message); }
+    } catch (e) { setText(message); setError(t(locale, 'error.orderFailed', { message: (e as Error).message })); }
     finally { setBusy(false); }
   }
 
@@ -214,7 +222,7 @@ export default function PlayScreen() {
   async function updateProvince(provinceId: string, patch: { governorName?: string; mode?: string; policy?: string }) {
     if (!view) return;
     if (s?.verdict?.over) return; // 终局后地图上的待决卡/国策/省政不该还能点 setBusy(true); setError('');
-    try { setView(await api<View>(`runs/${view.id}/province-update`, { commandId: crypto.randomUUID(), expectedRevision: view.world.version, provinceId, reason: '玩家在省政面板交付', ...patch })); markOnboard('set-policy'); }
+    try { setView(await api<View>(`runs/${view.id}/province-update`, { commandId: crypto.randomUUID(), expectedRevision: view.world.version, provinceId, reason: t(locale, 'play.provinceReason'), ...patch })); markOnboard('set-policy'); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   async function openExport() {
@@ -286,7 +294,7 @@ export default function PlayScreen() {
       case 'saves': return <SaveSlotsPanel tab={saveTab} onTab={setSaveTab} slots={slots} achv={achv} busy={busy} note={saveNote} onSaveSlot={x => void saveToSlot(x)} onLoadSlot={x => void loadFromSlot(x)} onClearSlot={x => void clearSlot(x)} onRefresh={() => void refreshAchv()} onClose={() => setPanel(null)} />;
       default: return null;
     }
-  }, [view, panel, s, busy, locale, next, slots, achv, saveNote, rawWorld]);
+  }, [view, panel, s, busy, locale, next, slots, achv, saveNote, saveTab, rawWorld]);
 
   // 外交/计策面板按需拉一次原始世界：DiplomacyPanel 吃引擎的 DiplomaticState + 玩家阵营 id，
   // StratagemPanel 的资格判定要吃本方军队与城池（eligibility 直接读 WorldSnapshot）——

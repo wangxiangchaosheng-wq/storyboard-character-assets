@@ -1,7 +1,7 @@
 'use client';
 import {useState} from 'react';
 import {recommendDifficulty,type Difficulty} from '../../agents/src/onboarding';
-import {scenarioTitle,scenarioPremise,scenarioHasSimulation,type ScenarioPreset} from '../../agents/src/scenarios';
+import {scenarioTitle,scenarioPremise,scenarioHasSimulation,effectiveYears,type ScenarioPreset} from '../../agents/src/scenarios';
 import {useLocale,translate as t,translateEnum} from '../lib/i18n';
 
 /**
@@ -32,7 +32,7 @@ export default function ScenarioPicker({scenarios,difficulties,onStart,onCancel}
      {/* 诚实标注：这一局开出来是带本地战役推演，还是只有问对与阅览。判据走引擎自己的
          scenarioHasSimulation（buildInitialWorld 的准入门槛），不在这里复制年份表。 */}
      <span className={`scenario-picker-mode ${scenarioHasSimulation(s)?'can-sim':''}`}>{t(locale,scenarioHasSimulation(s)?'scenario.mode.sim':'scenario.mode.reading')}</span>
-     <small>{t(locale,'scenario.meta',{year:s.year,season:s.season,faction:s.faction,years:s.targetYears})}</small>
+     <small>{t(locale,'scenario.meta',{year:s.year,season:s.season,faction:s.faction,years:effectiveYears(s)})}</small>
      <p>{scenarioPremise(s,locale)}</p>
      <em>{s.cast.map(c=>c.name).join(t(locale,'scenario.joiner'))}</em>
     </button></li>)}</ul>

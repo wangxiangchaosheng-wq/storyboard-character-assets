@@ -27,7 +27,8 @@ export default function StratagemPanel({ world }: { world?: import('../../agents
   {prompt.trim()&&!matched&&<p className="stratagem-miss">{t(locale,'panel.stratagem.miss')}</p>}
   <ul className="stratagem-list">{rows.map(s=>{
    const sum=stratagemSummary(s);
-   const e=matched?eligibility(matched,{} as never):null;
+   // 资格判定要吃真世界快照：传 {} 会让 eligibility 恒判不合格，玩家自提妙计永远看到「欠 XXX」
+ const e=matched?eligibility(matched,world as never):null;
    return <li key={s.id}>
     <div className="stratagem-row"><span className="stratagem-kind">{translateEnum(locale,'panel.stratagem.kind',s.kind)}</span><b>{stratagemTitle(s,locale)}</b>
      <span className="stratagem-odds">{Math.round(s.baseSuccess*100)}%</span></div>

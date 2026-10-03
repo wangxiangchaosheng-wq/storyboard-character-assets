@@ -736,7 +736,14 @@ function shipments(w:WorldSnapshot,dt:number,r:SimulationReport){
   // 原来的 `c.status!=='waiting'` 让等不到人的运输队永远停下：军队继续前进就永不相遇，
   // 货物霉变到只剩一半，而且「该部队已有在途补给」把后续补给也堵死——玩家在路上
   // 完全无法得到补给（实测补 10000kg，最终货烂到 0，军队 5000→1093 人）。
-  const chasing=c.status==='waiting'&&model(w,c.targetArmyId).roadKm!==null?model(w,c.targetArmyId).roadKm:end;
+  // B1（QA 实测锁死一局）：追军目标必须夹紧在**运输队所在路**的 [0, distanceKm] 内。
+ // 原来直接把军队在自己路上的 roadKm 当目标：军队换到一条更长的路（如江淮道 200km）
+ // 后，运输队（在鸿沟 180km 上）会被追到 200km —— 越过自身路末，validateWorld 的
+ // `0 <= roadKm <= distanceKm` 当场拒，此后每一次推进/跳转都 400「本地推演数值越界」，
+ // 时间永远无法流动，且错误一句提不上是补给的事。夹紧后至多追到自己路的末端，
+ // 军队确实在更长的路上时，两军在路口交接（closeEnoughTo 的本意）。
+ const armyTarget=model(w,c.targetArmyId).roadKm;
+ const chasing=c.status==='waiting'&&armyTarget!==null?clamp(armyTarget,0,road.distanceKm):end;
   // 返程的运输队货已交清（cargo/ration 都是 0），若仍要求「有粮才动」，它就永远冻在交付点：
   // 实测 40 天后仍在 km 200.8 一动不动，而「该部队已有在途补给」把 returning 也算在途，
   // 这支部队从此再也收不到任何补给，出发城的运力也被永久吃掉。人员照旧走得回来。
@@ -755,7 +762,7 @@ function shipments(w:WorldSnapshot,dt:number,r:SimulationReport){
   //  曾经一律按 end 判：军队驶过下单时的会合点后，roadKm 与 end 的差值只会越来越大，
   //  这个 continue 永远截住，met 检查永不执行——运输队卡在 waiting 上追 20+ 天，
   //  货霉变、军队粮为 0、且「已有在途补给」把后续补给也堵死。
-  const goalKm=c.status==='waiting'&&model(w,c.targetArmyId).roadKm!==null?model(w,c.targetArmyId).roadKm:end;
+  const goalKm=c.status==='waiting'&&armyTarget!==null?clamp(armyTarget,0,road.distanceKm):end;
   const tolerance=rule(w,'marchKmDay')/24*2+1e-5;
   if(Math.abs(c.roadKm-goalKm)>tolerance&&c.status!=='travelling')continue;
   if(c.status==='returning'){

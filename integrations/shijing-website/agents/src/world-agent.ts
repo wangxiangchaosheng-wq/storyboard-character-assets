@@ -2,6 +2,8 @@ import {projectStrategy,type StrategyData} from './strategy-view.js';
 import {issueOrder,advanceWorld,validateOrder,validateAdvance} from './simulation-engine.js';
 import {parseLocalCommand,LOCAL_COMMAND_HELP} from './simulation-commands.js';
 import {understandLocalCommand} from './command-understanding.js';
+import {settleFiscal} from './treasury.js';
+import {assessUpheaval} from './upheaval.js';
 import {worldVerdict} from './world-state.js';
 import {DECISION_EVENTS,applyDecision,lookupEvent,blockingDecision,lookupNews} from './decisions.js';
 import {jumpToDay,validateJump,type JumpCommand,type JumpReport} from './jump.js';
@@ -386,8 +388,15 @@ export class WorldAgent implements WorldStateService {
     const mandates=readCommanderState((this.store.run(runId) as {commander?:CommanderState}).commander).mandates;
     const round=court==='attending'?null:runCommanderRound({world:flushed.world,mandates,court:(court==='indulging'?'indulging':'delegated') as 'delegated'|'indulging'});
     const advanced=round?round.world:flushed.world;
-    return this.commitLocal(runId,kind,input,advanced,
-      {...result.report,summaries:[...result.report.summaries,...flushed.notes,...(round?.result.notes||[])]},before);
+    // B4（QA 实测）：财政结算与失败预警此前只在 jump 里做，单次「推进 N 天」一件都不跑——
+    // 玩家连推 30 日 fiscal 四项仍全 0、alarms 空空，面板看着像坏了。两种推进口径必须一致。
+    let report={...result.report,summaries:[...result.report.summaries,...flushed.notes,...(round?.result.notes||[])]};
+    if(advanced.fiscal&&result.report.advancedHours>0)report.fiscal=settleFiscal(advanced.fiscal,advanced,result.report.advancedHours/24);
+    if(result.report.advancedHours>0){
+      const assessed=assessUpheaval(advanced,advanced.fiscal?.arrearsDays||0);
+      report.alarms=assessed.risks.filter(r=>r.tier!=='notable').map(r=>({kind:r.kind,subjectName:r.subjectName,risk:r.risk,reason:r.reason,tier:r.tier}));
+    }
+    return this.commitLocal(runId,kind,input,advanced,report,before);
   }
   /**
    * 主上的军令当堂记录、按驿传日子生效。

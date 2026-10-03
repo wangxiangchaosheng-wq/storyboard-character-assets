@@ -609,6 +609,7 @@ const ZH = {
   'launcher.mode.engine': '引擎局',
   'launcher.starting': '正在展开这一局…',
   'launcher.error.noScenario': '没有这个剧本，请重新选择。',
+  'play.provinceReason': '玩家在省政面板交付',
 
   // ── 调试控制台（/play/debug） ─────────────────────────
   'debug.aria': '调试控制台',
@@ -1321,6 +1322,7 @@ const EN: Record<MessageKey, string> = {
   'launcher.mode.engine': 'Engine run',
   'launcher.starting': 'Opening this run…',
   'launcher.error.noScenario': 'No such scenario. Pick one again.',
+  'play.provinceReason': 'Delivered from the province panel',
 
   // ── Debug console (/play/debug) ───────────────────────
   'debug.aria': 'Debug console',

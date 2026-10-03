@@ -86,6 +86,11 @@ export interface SimulationReport {
   /** 本段推进跨过的史实锚点行（anchors.ts）。与 summaries 里的【史】行同源；单列一份
    *  是为了让跳转按结构汇总、界面按条目渲染，而不是去 parse 文本。 */
   history?:string[];
+  /** 财政结算行（钱/民力/欠饷），由 treasury.settleFiscal 产出。advance 与 jump 两种推进
+   *  口径都要填（B4：此前只有 jump 填，单次推进的 fiscal 面板永远是 0）。 */
+  fiscal?:string[];
+  /** 失败模式预警（哗变/断粮…），由 upheaval.assessUpheaval 产出；tier!=='notable' 的才在列。 */
+  alarms?:{kind:string;subjectName:string;risk:number;reason:string;tier:string}[];
 }
 export const clamp=(value:number,min=0,max=100)=>Math.min(max,Math.max(min,value));
 export const round=(value:number)=>Math.round(value*1e8)/1e8;

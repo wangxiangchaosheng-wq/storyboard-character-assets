@@ -158,7 +158,58 @@ test('第 7 轮：粜粮济民——城粮换朝望与寒门认可，留 1 万�
  const low=agent.getWorld(id);low.cities.chengdu.foodKg=50000;
  agent.store.transaction(()=>{agent.store.db.prepare('UPDATE world_states SET payload=? WHERE run_id=?').run(JSON.stringify(low),id);agent.mirror(id,low);});
  assert.throws(()=>agent.sellGrain(id,{commandId:'r7-sell-2',expectedRevision:agent.getWorld(id).revision,cityId:'chengdu',amountKg:50000}),/底仓/);
- // 敌城不可粜
+ 
+// B4（QA 实测）：财政结算与失败预警此前只在 jump 里做，单次「推进 N 天」一件都不跑——
+// 连推 30 日后 fiscal 四项仍全 0、alarms 空空，玩家会以为 fiscal 面板坏了。两种推进口径必须一致。
+test('B4：单次推进也结算财政与朝局预警，与跳转同口径',()=>{
+ const {agent,id}=setup(t);
+ const before=agent.getWorld(id);
+ assert.ok(before.fiscal,'本局应有财政层');
+ for(let i=0;i<30;i++){
+  // 途中冒出的决策卡要就地裁掉，否则后续推进被 blockingDecision 拦下（与真人玩法一致）
+  const cur=agent.getWorld(id);
+  if(cur.pendingDecision){
+   // 不一定有 decline 选项：取该卡给的第一个选项，别把测试卡在选项上
+   // 抉择表在 DECISION_EVENTS 里（decisions.ts）；取第一个选项 id，news 卡只有「知道了」
+   const ev=DECISION_EVENTS.find(e=>e.id===cur.pendingDecision.eventId);
+   const choice=(ev&&ev.choices&&ev.choices[0]&&ev.choices[0].id)||'decline';
+   agent.decide(id,{commandId:'b4-decide-'+i,expectedRevision:cur.revision,choiceId:choice});
+  }
+  agent.localAdvance(id,{commandId:'b4-adv-'+i,expectedRevision:agent.getWorld(id).revision,hours:24});
+ }
+ const after=agent.getWorld(id);
+ const day=after.simulation.timeHours/24;
+ assert.ok(day>=29,'推进应真的走过 30 日');
+ // 钱或民力至少有一项因结算而离开 0（军饷是刚性支出，库藏可能不减反增，故看「不等于初始值」）
+ const moved=after.fiscal.treasury.coin!==before.fiscal.treasury.coin||after.fiscal.treasury.corvee!==before.fiscal.treasury.corvee||after.fiscal.arrearsDays!==before.fiscal.arrearsDays;
+ assert.ok(moved,'单次推进必须结算财政（三项里至少动一项）');
+ balance(after);
+});
+// B1（QA 实测锁死一局）：运输队 waiting 时会去追军队，但目标必须夹紧在**运输队所在路**内。
+// 原来直接把军队在自己路上的 roadKm 当目标：军队走到更远的路上后，运输队（在短路上）被追到
+// 超过自身路末，validateWorld 的 0<=roadKm<=distanceKm 当场拒，此后每次推进/跳转都
+// 400「本地推演数值越界」，时间永远无法流动——且错误一句提不上是补给的事。
+// 回归：运输队在 6km 的短路上等、军队在 200km 的函谷道 190km 处，推进必须不抛。
+test('B1：运输队追军不越过自身道路距离——越界曾让整局每次推进都 400',()=>{
+ let w=fixture();
+ const shortRoad='road-ziwu',longRoad='road-hangu';
+ w.simulation.roads[shortRoad].distanceKm=6;          // 运输队所在：6km 短路
+ const a=w.armies['army-wei-yan'],m=w.simulation.armies[a.id];
+ w.simulation.shipments['b1-ship']={id:'b1-ship',sourceCityId:'hanzhong',targetArmyId:a.id,factionId:a.factionId,
+  roadId:shortRoad,roadKm:3,targetKm:6,carriers:20,cargoKg:5000,rationKg:0,waterAccessible:true,status:'waiting',createdHour:w.simulation.timeHours};
+ // 货是凭空造出来的，同步抬总账的初始量，否则守恒式先被自己捅破
+ w.simulation.ledger.initialFoodKg=round(w.simulation.ledger.initialFoodKg+5000);
+ w.simulation.ledger.initialPeople=round(w.simulation.ledger.initialPeople+20); // 20 名运输人员同账
+ // 军队在 200km 的函谷道上 190km 处——远超运输队那条 6km 的路
+ m.knownRoads=[shortRoad,longRoad];m.roadId=longRoad;m.roadKm=190;m.atCityId=null;
+ const _c=w.cities.changan.point,_l=w.cities.luoyang.point;
+ a.location={kind:'field',point:{x:(_c.x+_l.x)/2,y:(_c.y+_l.y)/2},label:'函谷途中'};
+ assert.doesNotThrow(()=>{for(let i=0;i<5;i++){const r=advanceWorld(w,advance(w,24));w=r.world;balance(w);}},'追军不得把运输队推出自身道路');
+ const sh=w.simulation.shipments['b1-ship'];
+ assert.ok(sh.roadKm<=w.simulation.roads[shortRoad].distanceKm+1e-6,'运输队位置不得越过自身道路末端');
+ assert.equal(w.simulation.armies[a.id].roadId,longRoad,'军队仍应在自己的长路上');
+});
+// 敌城不可粜
  assert.throws(()=>agent.sellGrain(id,{commandId:'r7-sell-3',expectedRevision:agent.getWorld(id).revision,cityId:'changan',amountKg:50000}),/只能粜己方/);
 });
 // BUG-001（QA 实测复现，严重）：粜粮只减城粮不记总账 → 守恒式破洞 → 此后**每一个**写操作

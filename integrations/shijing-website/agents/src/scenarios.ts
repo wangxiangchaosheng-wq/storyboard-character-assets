@@ -60,7 +60,15 @@ export const SCENARIOS:ScenarioPreset[]=[
 ];
 
 export function scenario(id:string):ScenarioPreset|null{return SCENARIOS.find(s=>s.id===id)||null;}
-export function scenarioSummary(s:ScenarioPreset):string[]{return [`年代：公元${s.year}年${s.season}`,`阵营：${s.faction}`,`人物：${s.cast.map(c=>c.name).join('、')}`,`建议年数：${s.targetYears} 年`,s.premise];}
+/** 这一局**实际**会跑到第几年。剧本卡面写 30 年、引擎单局上限只到 10 年（day 3650，
+ *  见 world-bootstrap 的 goalYears 与 jump 的 MAX_JUMP_DAYS）时，卡面必须显示夹紧后的值，
+ *  否则玩家看着「30 年」开局、终局却宣布「10 年之期已满」，自相矛盾（QA 实测 B5）。
+ *  口径与 world-bootstrap.goalYears 逐字一致：min(targetYears, floor(3650/365))。 */
+export function effectiveYears(s:ScenarioPreset):number{
+ const years=Number.isFinite(s.targetYears)&&s.targetYears>0?s.targetYears:10;
+ return Math.min(years,10);
+}
+export function scenarioSummary(s:ScenarioPreset):string[]{return [`年代：公元${s.year}年${s.season}`,`阵营：${s.faction}`,`人物：${s.cast.map(c=>c.name).join('、')}`,`建议年数：${effectiveYears(s)} 年`,s.premise];}
 
 /**
  * 转成 contracts.ts 的 Spec。metrics 置空是硬约束：buildInitialWorld 拒绝带指标的 spec

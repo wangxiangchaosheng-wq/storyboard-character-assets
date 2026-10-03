@@ -878,7 +878,16 @@ button:disabled{cursor:default}
 .play-dock button.selected span{color:#d8b06a}
 .play-dock-badge{position:absolute;top:3px;right:8px;min-width:15px;height:15px;border-radius:999px;background:#a54d39;color:#fff;font-size:10px;font-style:normal;line-height:15px;text-align:center;padding:0 3px}
 /* 抽屉：flex 兄弟项（见 .play-body 注释）——不是绝对定位浮层 */
-.play-drawer{position:static;flex:none;width:min(430px,42vw);background:#1a1f15f2;border-left:1px solid #2c3324;box-shadow:-8px 0 30px #0008;overflow-y:auto;padding:14px 16px 24px;color:#d8cfae;font-size:13px}
+.play-drawer{position:relative;z-index:8;flex:none;width:min(430px,42vw);background:#1a1f15f2;border-left:1px solid #2c3324;box-shadow:-8px 0 30px #0008;overflow-y:auto;padding:14px 16px 24px;color:#d8cfae;font-size:13px}
+/*
+ * 抽屉必须自己当「包含块」：position:static 不定位，而复用的纸色面板（国力/国库/外交/军情/
+ * 计策/起居注/存档/省政）全是 position:absolute 且 left:50% —— 它们会越过抽屉相对**初始
+ * 包含块**定位，直接飞到页面左上/顶中，抽屉里只剩空壳，右上角的关闭 × 也一起飞走（实测）。
+ * 有了 position:relative 之后，再把它们在抽屉语境下的绝对定位/固定宽度作废，随抽屉宽度排布。
+ */
+.play-drawer :is(.treasury-panel,.fog-panel,.stratagem-panel,.province-panel,.chronicle,.saves-panel,.strategy-power,.diplo-panel,.anchor-timeline){position:static!important;inset:auto!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;width:auto!important;max-width:none!important;max-height:none!important;transform:none!important;margin:0 0 14px!important;z-index:auto!important;overflow:visible!important}
+/* /play 作用域：告警条走流内，不再 absolute 压抽屉（.alarm-banner 的 z-index:7 曾盖住抽屉） */
+.play>.alarm-banner{position:static!important;inset:auto!important;left:auto!important;top:auto!important;transform:none!important;width:auto!important;margin:6px 12px!important;z-index:auto!important}
 .play-drawer-close{position:absolute;top:8px;right:10px;border:1px solid #4a4433;border-radius:5px;background:#222917;color:#cfc39a;width:24px;height:24px;font-size:15px;line-height:1;cursor:pointer}
 .play-drawer h2{margin:0 0 10px;font-size:15px;font-weight:600;letter-spacing:.08em;color:#e8dcc0}
 .play-pane-line{margin:0 0 10px;color:#b7a878}

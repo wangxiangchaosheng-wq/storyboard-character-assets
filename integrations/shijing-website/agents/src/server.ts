@@ -239,11 +239,15 @@ export function makeServer(store:Store,worker:Worker){
           assert(typeof b.intent==='string'&&b.intent.trim().length>0&&b.intent.length<=2000,'方略原话应为 1—2000 字');
           const constraints=Array.isArray(b.constraints)?b.constraints.map((c:unknown)=>String(c??'').slice(0,200)).filter((c:string)=>c.length>0):[];
           const w=worlds.getWorld(id),day=w?currentDay(w):0;
+          // B6（QA 实测）：终局后 mandate/revoke 仍在改写授权簿，而其余 14 条写路径都已 409。
+          if(w){const ended=worldVerdict(w);assert(!ended.over,'本局已终局：'+ended.summary+'。请另开新议题。',409);}
           out=store.transaction(()=>{const next=grantMandate(readCommander(id),role as CommanderRole,(b.intent as string).trim(),constraints,day);saveCommander(id,next);return{...next,day};});
         }
         else if(method==='POST'&&path[2]==='commander'&&path[3]==='revoke'&&path.length===4){
           const b=await body(req),role=String(b.role??'');assert(COMMANDER_ROLES.includes(role as CommanderRole),'受命大臣只能是 丞相/太尉/太傅/司徒');
           const w=worlds.getWorld(id),day=w?currentDay(w):0;
+          // B6：同上——终局后不得再改授权簿。
+          if(w){const ended=worldVerdict(w);assert(!ended.over,'本局已终局：'+ended.summary+'。请另开新议题。',409);}
           out=store.transaction(()=>{const next=revokeMandate(readCommander(id),role as CommanderRole,day);saveCommander(id,next);return{...next,day};});
         }
         else if(method==='POST'&&path[2]==='commander'&&path[3]==='plan'&&path.length===4){

@@ -24,7 +24,8 @@ type WorldSnapshot = {
   politics?: { prestige: number; factions: Record<string, { approval: number }> };
   focuses?: { points: number; active: { focusId: string; endsDay: number }[]; available: { id: string; title: string }[] };
   techs?: { points: number; active: { techId: string; endsDay: number }[]; available: { id: string; title: string }[] };
-  anchors?: { id: string; label: string; day: number }[];
+  // HistoryAnchor 的字段是 title/day（anchors.ts），不是 label——按 label 读会恒 undefined。
+  anchors?: { id: string; title: string; day: number }[];
   whatIfs?: { id: string; title: string }[];
   pendingDecision?: { eventId: string } | null;
   decisions: Record<string, { id: string; title: string; status: string }>;
@@ -33,7 +34,12 @@ type View = { id: string; title?: string; spec?: { title: string }; mode?: strin
 type WorldEvent = { id: string; revision: number; fromDay: number; toDay: number; title: string; summary: string; changes: unknown[]; related: { type: string; id: string }[] };
 type RunSummary = { id: string; title: string; mode: string; createdAt: string };
 type AnalysisResult = { derived?: number; reason?: string };
-type AchievementsView = { unlocked?: { name: string }[]; locked?: { name: string }[] };
+type AchievementsView = { progress: { id: string; unlocked: boolean }[]; newlyUnlocked: { name: string }[]; summary: string[]; steamAvailable: boolean };
+
+function detectLocale(): 'zh-CN' | 'en' {
+  try { const v = localStorage.getItem('shijing-locale'); if (v === 'en' || v === 'zh-CN') return v; } catch { /* 隐私模式 */ }
+  return navigator.language?.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
+}
 
 async function api<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch('/api/agents/' + path, {
@@ -43,7 +49,7 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
     signal: AbortSignal.timeout(body === undefined ? 20000 : 120000),
   });
   const data = await res.json() as T & { error?: string };
-  if (!res.ok) throw new Error(data.error || `请求失败（${res.status}）`);
+  if (!res.ok) throw new Error(data.error || t(detectLocale(), 'error.http', { status: res.status }));
   return data;
 }
 
@@ -134,7 +140,10 @@ export default function DebugConsolePage() {
       setBusy(t(locale, 'debug.achievements'));
       try {
         const r = await api<AchievementsView>(`runs/${runId}/achievements`);
-        const line = `${t(locale, 'debug.unlocked')} ${(r.unlocked || []).length} / ${(r.unlocked || []).length + (r.locked || []).length}`;
+        // #8：真实响应是 {progress,newlyUnlocked,summary,steamAvailable}——曾经按 {unlocked,locked}
+        // 读，两个字段都不存在，调试台永远显示「已解锁 0 / 0」（假数据）。
+        const unlocked = r.progress.filter(p => p.unlocked).length;
+        const line = `${t(locale, 'debug.unlocked')} ${unlocked} / ${r.progress.length}` + (r.steamAvailable ? '' : '（本机记录）');
         setAnalysis(a => ({ ...a, achievements: line }));
         note(line);
       } catch (e) { note(`${t(locale, 'debug.achievements')}：${e instanceof Error ? e.message : String(e)}`); }
@@ -249,7 +258,7 @@ export default function DebugConsolePage() {
         </div>}
         {!!world?.anchors?.length && <div className="debug-analysis-block">
           <h3>{t(locale, 'debug.anchorList')}（{world.anchors.length}）</h3>
-          <ul>{world.anchors.map(a => <li key={a.id}>{t(locale, 'debug.eventDay', { day: a.day })} · {a.label}</li>)}</ul>
+          <ul>{world.anchors.map(a => <li key={a.id}>{t(locale, 'debug.eventDay', { day: a.day })} · {a.title}</li>)}</ul>
         </div>}
         {!!world?.whatIfs?.length && <div className="debug-analysis-block">
           <h3>{t(locale, 'debug.whatIfList')}（{world.whatIfs.length}）</h3>

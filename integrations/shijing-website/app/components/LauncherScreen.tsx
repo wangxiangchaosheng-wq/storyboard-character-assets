@@ -25,6 +25,11 @@ type View = { id: string; title?: string; spec?: { title: string }; mode?: strin
 type Health = { configured?: boolean; engineConfigured?: boolean; generationEnabled?: boolean; libraryCount?: number };
 type RunSummary = { id: string; title: string; mode: string; createdAt: string };
 
+function detectLocale(): 'zh-CN' | 'en' {
+  try { const v = localStorage.getItem('shijing-locale'); if (v === 'en' || v === 'zh-CN') return v; } catch { /* 隐私模式 */ }
+  return navigator.language?.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
+}
+
 async function api<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch('/api/agents/' + path, {
     method: body === undefined ? 'GET' : 'POST',
@@ -33,7 +38,7 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
     signal: AbortSignal.timeout(body === undefined ? 20000 : 60000),
   });
   const data = await res.json() as T & { error?: string };
-  if (!res.ok) throw new Error(data.error || `请求失败（${res.status}）`);
+  if (!res.ok) throw new Error(data.error || t(detectLocale(), 'error.http', { status: res.status }));
   return data;
 }
 
