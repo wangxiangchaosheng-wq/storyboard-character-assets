@@ -45,6 +45,12 @@ export interface Intelligence {
   observerFactionId:string; enemyArmyId:string; seenHour:number;
   atCityId:string|null; roadId:string|null; roadKm:number; estimatedTroops:number;
 }
+/** 城市级探索情报的 enemyArmyId 前缀（BUG-121 立、B8 修）。
+ *  探索令落的情报语义是「这座城大致有多少守军」，不是「认出了哪支敌军」：enemyArmyId 取
+ *  `explore-<cityId>`（不对应任何真实军队），estimatedTroops 是当时全城非本方军队总数。
+ *  引擎写、迷雾读，两边共用这一个常量——曾经两边各写各的字面量，fog 只按真实敌军 id
+ *  精确匹配，于是「探明城防」点不亮城内守军、summary 恒报「已探明敌军 0 支」（QA B8）。 */
+export const EXPLORE_INTEL_PREFIX='explore-';
 /** 季节传闻状态（第 5 轮）：传闻卡到案即挂、到期自解（advanceWorld 每步过滤）。
  *  旧存档没有这个字段——可选，validateSimulation 对 undefined 放行。 */
 export interface SeasonalState {key:string;untilDay:number}

@@ -543,10 +543,18 @@ export class WorldAgent implements WorldStateService {
    *   才开始动**（见 advanceWorld 里 edictInTransit 那一行）。
    * 同时把这道令挂到 pendingEdicts 供界面提示，并保留到期回报的钩子。
    *
+   * B7 例外——**探索令不挂驿传**：探索是派斥候探城，不是往军中发诏令。installOrder 的
+   * 探索分支当堂就把情报写进 intelligence（seenHour=当前小时，fog 当即可见），再给它算
+   * 驿传日子、写「N 日后到军中」，起居注就与玩家眼前可见的情报自相矛盾（QA B7 实测：
+   * 情报即时入簿的同时写着「4 日后到军中」）。所以探索令：不算 days、不进 pendingEdicts
+   * （界面在途栏与 pendingEdictCount 都不该出现它）、回执改说「斥候即日回报」。
+   * 其余令种照旧——行军/进攻/补给的「迟」正是这一层的存在意义。
+   *
    * 只迟**主上的令**。太尉代决的危局（断粮补给等）仍当天办：那是生存问题不是战略选择，
    * 代码里写着「不待旨」，迟三日部队已经饿死了（见 observe() 的后勤常例）。
    */
   private queueEdict(before:WorldSnapshot,input:SimulationCommand):[WorldSnapshot,SimulationReport]{
+    const exploring=input.kind==='explore';   // B7：斥候不涉驿传，见方法注释
     const days=edictTransitDays(before,input.armyId,input.targetCityId);
     // 只给**本命令新装上的订单**打生效时刻。补给令不换订单（installOrder 里 supply 早退），
     // 那时军队身上还挂着上一条行军令——照着打戳就会把在走的队伍也摁住几天（实测踩过）。
@@ -554,20 +562,27 @@ export class WorldAgent implements WorldStateService {
     const {world,report}=issueOrder(before,input);
     const model=world.simulation?.armies[input.armyId];
     const order=model?.order;
-    if(order&&days>0&&order.id!==priorOrderId)order.arrivalHour=(world.simulation!.timeHours)+days*24;
+    if(!exploring&&order&&days>0&&order.id!==priorOrderId)order.arrivalHour=(world.simulation!.timeHours)+days*24;
     const army=world.armies[input.armyId];
     // UX-010：军令类型是英文枚举（march/attack/resupply…），照抄进叙事就是「·resupply」
     // 满天飞。玩家只见中文动词；补给令点明自何处发粮，行军/进攻点明去向。
     const kindCN=ORDER_KIND_CN[input.kind]||input.kind;
     const place=input.targetCityId?world.cities[input.targetCityId]?.name||input.targetCityId:input.sourceCityId?`（自${world.cities[input.sourceCityId]?.name||input.sourceCityId}）`:'';
     const note=`${army?.name||input.armyId}·${kindCN}${place}`;
-    const list=world.pendingEdicts||(world.pendingEdicts=[]);
-    list.push({id:'edict-'+String(input.commandId).replace(/[^0-9a-zA-Z_-]/g,''),armyId:input.armyId,kind:input.kind,
-      ...(input.targetCityId?{targetCityId:input.targetCityId}:{}),...(input.sourceCityId?{sourceCityId:input.sourceCityId}:{}),
-      ...(input.foodKg?{foodKg:input.foodKg}:{}),issuedDay:world.clock.elapsedDays,arrivalDay:world.clock.elapsedDays+days,
-      issuedBy:'主上',note});
+    // B7：探索令不进在途诏令簿——情报当堂已入簿，没有「令在途中」这回事。
+    if(!exploring){
+      const list=world.pendingEdicts||(world.pendingEdicts=[]);
+      list.push({id:'edict-'+String(input.commandId).replace(/[^0-9a-zA-Z_-]/g,''),armyId:input.armyId,kind:input.kind,
+        ...(input.targetCityId?{targetCityId:input.targetCityId}:{}),...(input.sourceCityId?{sourceCityId:input.sourceCityId}:{}),
+        ...(input.foodKg?{foodKg:input.foodKg}:{}),issuedDay:world.clock.elapsedDays,arrivalDay:world.clock.elapsedDays+days,
+        issuedBy:'主上',note});
+    }
     const merged:SimulationReport={...report,pauseReason:null,
-      summaries:[...report.summaries,`【诏令】${note}已付驿传，${days} 日后到军中（军中在途，未奉此旨之前不动）`]};
+      // B7：探索的回执说实话——斥候即日回报、军情当堂入簿、军队未动；不写「已付驿传，
+      // N 日后到军中」（那句只属于真要往军中传的旨意）。
+      summaries:[...report.summaries,...(exploring
+        ?[`【探索】${note}：斥候即日回报，军情已入簿；此令不涉驿传，军队未动`]
+        :[`【诏令】${note}已付驿传，${days} 日后到军中（军中在途，未奉此旨之前不动）`])]};
     return[world,merged];
   }
   /**

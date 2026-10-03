@@ -331,10 +331,18 @@ export function makeServer(store:Store,worker:Worker){
         assert(Number.isInteger(slot)&&slot>=0&&slot<=MAX_SLOTS,'槽位应为 1—8 的整数，或填 0 自动选槽');
         const runId=String(b.runId??'');assert(runId,'需要对局编号');store.run(runId);
         const w=worlds.getWorld(runId);assert(w,'此议题尚未初始化世界',409);
-        const target=slot||nextFreeSlot(store.directory);assert(target>0,'八个槽位都已存满，请先清空一个',409);
-        // court 只活在界面上（朝政状态），世界快照里没有它：由调用方随存档一起交存，读档时原样展示
-        const court=typeof b.court==='string'&&b.court.length<=20?b.court:'';
-        out={slot:writeSlot(store.directory,target,{...cloudSave().exportRunToSave(store.run(runId),w,allEvents(runId)),court,auto:b.auto===true})};
+        // court 只活在界面上（朝政状态），世界快照里没有它：由调用方随存档一起交存，读档时原样展示。
+        // B10：长度超限（或类型不对）**明确拒绝**，不再静默清空——静默变空串会让存档徽章
+        // 莫名空白，而这种「传了值却像没传」的 bug 极难查。上限 20 与界面徽章同口径。
+        assert(b.court===undefined||(typeof b.court==='string'&&b.court.length<=20),
+          `朝政状态（court）应为不超过 20 字符的字符串；收到${typeof b.court==='string'?` ${b.court.length} 字符`:` ${b.court===null?'null':typeof b.court} 类型`}`,400);
+        const court=typeof b.court==='string'?b.court:'';
+        const target=slot||nextFreeSlot(store.directory);
+        // B9：自动选槽（slot:0，终局自动存档走这条）在八个槽全满、又没有可覆盖的自动槽时，
+        // 按客户端口径**静默跳过**（{skipped:true}），不再 409——终局画面不该为一次性的自动
+        // 存档失败弹错误，手动存档入口一直都在。显式槽位（1—8）target>0 恒成立，永远覆盖写。
+        if(!target)out={skipped:true,reason:'八个槽位都已存满，且没有可覆盖的自动槽；本次自动存档已静默跳过（手动存档请指定槽位）'};
+        else out={slot:writeSlot(store.directory,target,{...cloudSave().exportRunToSave(store.run(runId),w,allEvents(runId)),court,auto:b.auto===true})};
       }
       else if(method==='POST'&&path[0]==='saves'&&path[1]==='load'&&path.length===2){
         const b=await body(req),slot=Number(b.slot);

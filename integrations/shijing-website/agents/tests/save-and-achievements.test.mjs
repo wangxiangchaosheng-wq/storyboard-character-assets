@@ -7,6 +7,9 @@ import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {evaluateForRun,loadUnlocked,saveUnlocked,commitUnlocks} from '../dist/achievement-runtime.js';
 import {MAX_SLOTS,listSlots,writeSlot,readSlot,clearSlot,nextFreeSlot} from '../dist/save-slots.js';
+import {Store} from '../dist/store.js';
+import {WorldAgent} from '../dist/world-agent.js';
+import {makeServer} from '../dist/server.js';
 import {ACHIEVEMENTS} from '../../steam/achievements.ts';
 import {exportRunToSave,importRunFromSave} from '../../steam/cloud-save.ts';
 const HERE=fileURLToPath(new URL('.',import.meta.url));
@@ -233,4 +236,71 @@ test('Steam cloud save backend is reachable, not just implemented',async()=>{
     return;
   }
   assert.equal(m[1].split(':')[1],'true','Steam 可用时云端后端必须 available');
+});
+
+/* ---------------- B9/B10：POST /saves 的静默跳过与 court 明确拒绝（真 sidecar 链路） ---------------- */
+const httpSpec={id:'northern-test',title:'诸葛亮北伐：子午谷奇谋',scenario:{background:'公元228年春。汉中向长安进军。'},cast:[{id:'wei-yan',name:'魏延',role:'蜀汉将领',description:'测试'}],metrics:[]};
+/** 起一个真 Store + 真 WorldAgent + 真 makeServer 的 sidecar，返回 HTTP 基址（选槽只认服务端一份）。 */
+async function saveServer(t){
+  const dir=mkdtempSync(join(tmpdir(),'shijing-saves-http-'));
+  const store=new Store(dir),agent=new WorldAgent(store),run=store.create(httpSpec);
+  t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true});});
+  const server=makeServer(store,{active:false,drain(){}});
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));
+  t.after(()=>new Promise(r=>{server.close(r);server.closeAllConnections();}));
+  return {store,agent,runId:run.id,base:'http://127.0.0.1:'+server.address().port};
+}
+const postSave=(base,body)=>fetch(base+'/saves',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+
+test('B9：满槽且无自动槽时，自动选槽（slot:0）静默跳过而不是 409',async t=>{
+  // QA B9：客户端注释写「槽满则静默跳过」，服务端却 409——终局自动存档失败会弹错误。
+  // 方向取服务端静默：有自动槽可覆盖就覆盖，都没有才跳过。
+  const {store,runId,base}=await saveServer(t);
+  for(let i=1;i<=8;i++)writeSlot(store.directory,i,stub({gameId:'run-'+i,title:'局'+i,savedAt:`2026-09-2${i}T10:00:00.000Z`,revision:i,elapsedDays:i}));
+  const res=await postSave(base,{slot:0,runId,court:'delegated',auto:true});
+  assert.equal(res.status,202,'静默跳过也是成功响应，不是 409');
+  const body=await res.json();
+  assert.equal(body.skipped,true,'响应要明说「已跳过」');
+  assert.match(body.reason,/已存满|自动槽/,'并给出可读的原因');
+  assert.equal(listSlots(store.directory).filter(s=>s.gameId).length,8,'一个槽都没被改动');
+  // 对照组1：八个槽满、但有一个自动槽 → 覆盖最早的自动槽，不跳过
+  writeSlot(store.directory,5,stub({gameId:'run-auto',title:'自动',savedAt:'2026-09-01T10:00:00.000Z',auto:true}));
+  const r2=await postSave(base,{slot:0,runId,court:'delegated',auto:true});
+  assert.equal(r2.status,202);
+  const b2=await r2.json();
+  assert.equal(b2.skipped,undefined,'有自动槽可覆盖：照常存档');
+  assert.equal(b2.slot.slot,5,'覆盖 savedAt 最早的自动槽');
+  assert.equal(b2.slot.court,'delegated','随存档交存的 court 原样落盘');
+  assert.equal(listSlots(store.directory).filter(s=>s.auto).length,1,'自动标记如实落盘');
+  // 对照组2：显式槽位永远覆盖写入，永不跳过（满槽也盖）
+  const r3=await postSave(base,{slot:8,runId,court:'attending'});
+  assert.equal(r3.status,202);
+  const b3=await r3.json();
+  assert.equal(b3.slot.slot,8);assert.equal(b3.slot.court,'attending');
+  assert.equal(listSlots(store.directory).filter(s=>s.gameId).length,8,'覆盖不增加槽数');
+});
+
+test('B10：court 超 20 字符明确 400，不再静默清空',async t=>{
+  // QA B10：court 超长被 slice/清空但不报错——存档徽章莫名空白，且极难查。
+  // 方向取明确拒绝：调用方传了 30 个字，就该当场知道上限是 20。
+  const {store,runId,base}=await saveServer(t);
+  const ok=await postSave(base,{slot:1,runId,court:'attending'});
+  assert.equal(ok.status,202);
+  assert.equal((await ok.json()).slot.court,'attending','合法 court 原样落盘');
+  // 缺 court 也合法（electron 的 route 自检调 POST /saves 就不带 court）
+  const none=await postSave(base,{slot:2,runId});
+  assert.equal(none.status,202,'不带 court 照常存档');
+  assert.equal((await none.json()).slot.court,'','缺省为空串');
+ // 超长：明确拒绝，错误说清上限，且不落盘
+ const longCourt='朝政状态长度超过二十个字符上限的测试值'.padEnd(30,'甲');
+ assert.ok(longCourt.length>20);
+  const bad=await postSave(base,{slot:3,runId,court:longCourt});
+  assert.equal(bad.status,400,'超长明确拒绝，不再静默清空');
+  assert.match((await bad.json()).error,/20 字符/,'错误一句说清上限');
+  assert.equal(readSlot(store.directory,3),null,'被拒的存档没有落盘');
+  // 非字符串同样拒绝（旧行为是静默变成空串）
+  const typed=await postSave(base,{slot:3,runId,court:123});
+  assert.equal(typed.status,400,'类型不对也明确拒绝');
+  assert.match((await typed.json()).error,/court/);
+  assert.equal(readSlot(store.directory,3),null,'类型不对也不落盘');
 });

@@ -1,7 +1,11 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import LocaleSwitch from '../../../app/components/LocaleSwitch';
-import { useLocale, translate as t } from '../../../app/lib/i18n';
+import { useLocale, translate as t, type Locale } from '../../../app/lib/i18n';
+// 事件流水的形状以引擎契约为准（agents/src/world-contracts.ts）：changes 是 FieldChange[]
+// （entity/field/before/after/unit/reason），related 是 EntityRef[]。只引类型，运行时不打包。
+import type { EntityRef, FieldChange } from '../../../agents/src/world-contracts';
+import type { SimulationReport } from '../../../agents/src/simulation-types';
 
 /**
  * 调试控制台 v1：/play/debug。
@@ -31,10 +35,74 @@ type WorldSnapshot = {
   decisions: Record<string, { id: string; title: string; status: string }>;
 };
 type View = { id: string; title?: string; spec?: { title: string }; mode?: string; createdAt?: string };
-type WorldEvent = { id: string; revision: number; fromDay: number; toDay: number; title: string; summary: string; changes: unknown[]; related: { type: string; id: string }[] };
+/**
+ * 对齐 agents/src/world-contracts.ts 的 WorldEvent：changes: FieldChange[]、related: EntityRef[]。
+ * 引擎侧 worldId/settlementId/decisionId/source 恒有、simulationReport 可选，但旧事件可能
+ * 没有这些键——判为可选：有值就摊开，没有不显示（渲染见 eventMeta / eventDetailLines）。
+ */
+type WorldEvent = {
+  id: string;
+  revision: number;
+  fromDay: number;
+  toDay: number;
+  title: string;
+  summary: string;
+  changes: FieldChange[];
+  related: EntityRef[];
+  worldId?: string;
+  settlementId?: string;
+  decisionId?: string | null;
+  source?: string;
+  simulationReport?: SimulationReport;
+};
 type RunSummary = { id: string; title: string; mode: string; createdAt: string };
 type AnalysisResult = { derived?: number; reason?: string };
 type AchievementsView = { progress: { id: string; unlocked: boolean }[]; newlyUnlocked: { name: string }[]; summary: string[]; steamAvailable: boolean };
+
+/**
+ * 变化值格式化（调试台原值口径）：
+ * - null/undefined 一律显示 'null'——引擎的不变量是 before: prev?.[field] ?? null
+ *   （world-state.ts / world-agent.ts），「此前无此值」与「值就是空」在 JSON 里同为 null；
+ *   显示 null 原文才能与同页「原始 JSON」逐字对上，也不会把 null 和真正的空字符串值混为一谈。
+ * - 空字符串显示 ""（JSON 原文），同样为了可分辨；
+ * - 数字/布尔/数组/对象走 JSON 原文，不做千分位、单位换算等「美化」——这一页要的是可核对。
+ */
+const fmtChangeValue = (locale: Locale, v: FieldChange['before'] | undefined): string => {
+  if (v === null || v === undefined) return t(locale, 'debug.eventNullValue');
+  if (typeof v === 'string') return v === '' ? '""' : v;
+  return JSON.stringify(v);
+};
+
+/** 事件头部的流水号/来源/决策：有值才拼；全都没有返回空串，调用方不渲染这一行。 */
+const eventMeta = (locale: Locale, e: WorldEvent): string => [
+  e.settlementId ? t(locale, 'debug.eventSettlement', { id: e.settlementId }) : '',
+  e.decisionId ? t(locale, 'debug.eventDecision', { id: e.decisionId }) : '',
+  e.source ? t(locale, 'debug.eventSource', { source: e.source }) : '',
+].filter(Boolean).join(' · ');
+
+/**
+ * 事件详情行（展开后显示）：每条 change 一行
+ * 「{entity.type}/{entity.id} · {field}: 原值 X → 新值 Y {unit}」（unit 可空），
+ * 下缩进一行挂 reason；末尾是相关对象（{type}:{id}）与推演报告（有才显示）。
+ */
+const eventDetailLines = (locale: Locale, e: WorldEvent): string[] => {
+  const lines: string[] = [];
+  for (const c of e.changes || []) {
+    const unit = c.unit ? ` ${c.unit}` : '';
+    lines.push(`${c.entity.type}/${c.entity.id} · ${c.field}: ${t(locale, 'debug.eventBefore', { value: fmtChangeValue(locale, c.before) })} → ${t(locale, 'debug.eventAfter', { value: fmtChangeValue(locale, c.after) })}${unit}`);
+    if (c.reason) lines.push(`    ${t(locale, 'debug.eventReason', { reason: c.reason })}`);
+  }
+  if (!e.changes?.length) lines.push(t(locale, 'debug.eventNoChanges'));
+  const related = (e.related || []).map(r => `${r.type}:${r.id}`);
+  lines.push(t(locale, 'debug.eventRelated', { list: related.length ? related.join(t(locale, 'common.joiner')) : t(locale, 'common.none') }));
+  const report = e.simulationReport;
+  if (report) {
+    let line = t(locale, 'debug.eventSimReport', { kind: report.kind, hours: report.advancedHours, rules: report.rulesVersion });
+    if (report.pauseReason) line += ` · ${t(locale, 'debug.eventPause', { reason: report.pauseReason })}`;
+    lines.push(line);
+  }
+  return lines;
+};
 
 function detectLocale(): 'zh-CN' | 'en' {
   try { const v = localStorage.getItem('shijing-locale'); if (v === 'en' || v === 'zh-CN') return v; } catch { /* 隐私模式 */ }
@@ -208,10 +276,18 @@ export default function DebugConsolePage() {
         <h2>{t(locale, 'debug.eventTitle')}</h2>
         {!events.length && <p className="debug-empty">{t(locale, 'debug.noEvents')}</p>}
         <ol className="debug-event-list">
-          {events.map(e => <li key={e.id}>
-            <header><b>r{e.revision}</b><span>{t(locale, 'debug.eventDay', { day: Math.floor(e.toDay) + 1 })}</span><span className="debug-event-title">{e.title}</span><span className="debug-event-changes">{t(locale, 'debug.eventChanges', { n: e.changes.length })}</span></header>
-            <p>{e.summary}</p>
-          </li>)}
+          {events.map(e => {
+            const meta = eventMeta(locale, e);
+            return <li key={e.id}>
+              <header><b>r{e.revision}</b><span>{t(locale, 'debug.eventDay', { day: Math.floor(e.toDay) + 1 })}</span><span className="debug-event-title">{e.title}</span><span className="debug-event-changes">{t(locale, 'debug.eventChanges', { n: e.changes.length })}</span></header>
+              <p>{e.summary}</p>
+              {!!meta && <p>{meta}</p>}
+              <details className="debug-raw">
+                <summary>{t(locale, 'debug.eventChangesDetail')}</summary>
+                <pre>{eventDetailLines(locale, e).join('\n')}</pre>
+              </details>
+            </li>;
+          })}
         </ol>
       </section>}
 

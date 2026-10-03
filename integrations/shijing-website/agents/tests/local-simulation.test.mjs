@@ -10,6 +10,7 @@ import {jumpToDay} from '../dist/jump.js';
 import {validateWorld,worldVerdict,pruneDecisions} from '../dist/world-state.js';
 import {foodTotal,peopleTotal} from '../dist/simulation-state.js';
 import {parseLocalCommand,isGrammarRejection} from '../dist/simulation-commands.js';
+import {fogReport} from '../dist/fog.js';
 import {expediteFocus} from '../dist/focuses.js';
 import {expediteTech} from '../dist/techs.js';
 import {evaluateForRun} from '../dist/achievement-runtime.js';
@@ -96,6 +97,39 @@ test('第 7 轮：探索必须指明目标城——「巡边」类无目标句�
  // 有目标的探索照常通过
  const r=parseLocalCommand(w,'魏延 探索 长安','cmd');
  assert.equal(r.kind==='order'&&r.input.kind,'explore');
+});
+test('B7：探索令不挂驿传——斥候即日回报、军情当堂入簿，起居注不写「N 日后到军中」',t=>{
+ // QA B7 实测矛盾：探索情报当堂入簿（fog 立即可见长安守军段位），queueEdict 却同时写
+ // 「已付驿传，4 日后到军中」——玩家看到 Delay 会以为自己下早了。方向取「情报即时、
+ // 去掉驿传句」：探索是派斥候，不是发诏令。
+ const {agent,id}=setup(t);
+ const w0=agent.getWorld(id);
+ agent.localOrder(id,{commandId:'explore-changan',expectedRevision:w0.revision,armyId:'army-wei-yan',kind:'explore',targetCityId:'changan'});
+ const w=agent.getWorld(id);
+ // ① 情报即时落簿：seenHour 就是当下，不等任何驿传日子
+ const seen=w.simulation.intelligence.filter(i=>i.atCityId==='changan');
+ assert.equal(seen.length,1,'同目标只留一条最新情报');
+ assert.equal(seen[0].enemyArmyId,'explore-changan','城级情报的 id 形态（B8 同链）');
+ assert.equal(seen[0].seenHour,w.simulation.timeHours,'探索情报当堂落簿');
+ assert.ok(seen[0].estimatedTroops>0,'长安守军规模已探明');
+ // ② 不挂在途诏令：inTransit 与 pendingEdictCount 都不该出现探索令
+ assert.equal((w.pendingEdicts||[]).length,0,'探索令不进 pendingEdicts');
+ // ③ 起居注/回执不再出现与即时生效矛盾的驿传句（「不涉驿传」的对照说明不算矛盾句式）
+ const event=agent.listEvents(id).at(-1);
+ assert.ok(!/已付驿传|日后到军中/.test(event.summary),'回执不得写「已付驿传，N 日后到军中」');
+ assert.match(event.summary,/斥候即日回报/,'回执如实说情报即日到');
+ assert.equal(event.title,'命令已登记','不是「诏令在途」');
+ // ④ 情报即时可用的下游证据：fog 当即可见长安守军（B8 的链路一起锁住）
+ const f=fogReport(w);
+ assert.equal(f.cities.find(c=>c.id==='changan').tier,'partial','长安城防即时探明');
+ assert.equal(f.armies.find(a=>a.id==='army-changan').tier,'partial','城内守军随城级情报升段位');
+ assert.match(f.summary[0],/已探明敌军 [1-9]/,'summary 不再恒报 0 支');
+ // 对照组：行军令照旧挂驿传——「迟」那一层没被一起拆掉
+ const rev=agent.getWorld(id).revision;
+ agent.localOrder(id,{commandId:'march-changan',expectedRevision:rev,armyId:'army-wei-yan',kind:'march',targetCityId:'changan'});
+ const after=agent.getWorld(id);
+ assert.equal((after.pendingEdicts||[]).length,1,'行军令照旧挂驿传');
+ assert.match(agent.listEvents(id).at(-1).summary,/已付驿传，\d+ 日后到军中/,'驿传句只属于真要传的旨意');
 });
 test('第 7 轮：点数加急——1 点缩短 1 日、单次上限 30 日、进行中才可加急（封顶后消费出口）',()=>{
  const w=fixture();

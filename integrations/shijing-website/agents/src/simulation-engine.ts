@@ -10,7 +10,7 @@ import {DECISION_EVENTS,NEWS_EVENTS,decisionsBetween,newsBetween,applyDecisionEf
 import {enqueueIncoming,dropIncoming,takeDueIncoming,reportTransitDays,edictTransitDays} from './courier.js';
 import {accruePoints,completeFocuses} from './focuses.js';
 import {accrueTechPoints,completeTechs} from './techs.js';
-import {clamp,round,interpolate,seasonalActive,type AdvanceCommand,type SimulationCommand,type SimulationReport,type ArmyModel,type Road} from './simulation-types.js';
+import {clamp,round,interpolate,seasonalActive,EXPLORE_INTEL_PREFIX,type AdvanceCommand,type SimulationCommand,type SimulationReport,type ArmyModel,type Road} from './simulation-types.js';
 
 const key=(value:string)=>createHash('sha256').update(value).digest('hex').slice(0,32);
 const kinds=['march','forced-march','garrison','resupply','attack','besiege','retreat','explore'];
@@ -141,7 +141,9 @@ function installOrder(w:WorldSnapshot,input:SimulationCommand,r:SimulationReport
   const city=w.cities[target];
   // 替换同目标旧情报：细作回报会刷新，不累积重复条目。
   s.intelligence=s.intelligence.filter(i=>!(i.observerFactionId===a.factionId&&i.atCityId===target));
-  s.intelligence.push({observerFactionId:a.factionId,enemyArmyId:'explore-'+target,seenHour:s.timeHours,atCityId:target,roadId:null,roadKm:0,estimatedTroops:Object.values(w.armies).filter(b=>b.location.kind==='city'&&b.location.cityId===target&&b.factionId!==a.factionId).reduce((n,b)=>n+b.troops,0)});
+  // B8：enemyArmyId 是城市级的（explore-<city>，见 EXPLORE_INTEL_PREFIX）——这条情报描述
+  // 的是「这座城有多少守军」，不是哪支敌军；fogReport 靠这个前缀把城内守军点亮成段位。
+  s.intelligence.push({observerFactionId:a.factionId,enemyArmyId:EXPLORE_INTEL_PREFIX+target,seenHour:s.timeHours,atCityId:target,roadId:null,roadKm:0,estimatedTroops:Object.values(w.armies).filter(b=>b.location.kind==='city'&&b.location.cityId===target&&b.factionId!==a.factionId).reduce((n,b)=>n+b.troops,0)});
   const id='decision-'+key(input.commandId);
   w.decisions[id]={id,title:`${a.name}：探索${city.name}`,orderText:`${a.name}遣细作探查${city.name}${city.ownerFactionId===a.factionId?'（己方城池，情报有限）':'，预计获悉守军规模与城防状态'}`,issuedDay:w.clock.elapsedDays,issuerId:automatic?'ai-marshal':'player',status:'executing',related:[{type:'army',id:a.id},{type:'city',id:target}]};
   r.summaries.push(w.decisions[id].orderText+'；命令已记录。');
