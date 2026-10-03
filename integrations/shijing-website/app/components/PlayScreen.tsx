@@ -67,6 +67,21 @@ export default function PlayScreen() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(() => t(locale, 'play.loading'));
   const [panel, setPanel] = useState<Panel | null>(null);
+  const [saveTab, setSaveTab] = useState<'saves' | 'achv'>('saves');
+  /** 开面板：存档/成就抽屉要把列表真的拉回来（否则槽位永远是空的），
+   *  切到成就页签要真的核算一次。 */
+  const openPanel = useCallback((p: Panel) => {
+    setPanel(cur => (cur === p ? null : p));
+    if (p !== 'saves') return;
+    void (async () => { try { setSlots((await api<{ slots: SaveSlotView[] }>('saves')).slots); } catch { /* 列表失败只让面板空着 */ } })();
+    void (async () => {
+      try {
+        const r = await api<AchievementsView & { newlyUnlocked: { name: string }[] }>('runs/' + runId.current + '/achievements');
+        setAchv(r);
+        showToast(r.newlyUnlocked.map(a => t(locale, 'save.unlocked', { name: a.name })));
+      } catch { /* 无成就可算时不打扰 */ }
+    })();
+  }, [locale]);
   const [text, setText] = useState('');
   const [act, setAct] = useState(false);
   const [jumpDay, setJumpDay] = useState('');
@@ -78,10 +93,20 @@ export default function PlayScreen() {
   const [achv, setAchv] = useState<AchievementsView | null>(null);
   const [toast, setToast] = useState<string[]>([]);
   const [saveNote, setSaveNote] = useState('');
-  const [rawDiplomacy, setRawDiplomacy] = useState<{ state: import('../../agents/src/diplomacy').DiplomaticState | null; me: string } | null>(null);
-  const [onboardDone, setOnboardDone] = useState<OnboardingStepId[]>(() => {
-    try { const raw: unknown = JSON.parse(localStorage.getItem('shijing-onboard-v1') || '[]'); return Array.isArray(raw) ? raw.filter((x): x is OnboardingStepId => ONBOARDING_STEPS.some(s => s.id === x)) : []; } catch { return []; }
-  });
+  const [rawWorld, setRawWorld] = useState<import('../../agents/src/world-contracts').WorldSnapshot | null>(null);
+  // 引导进度与难度档位：**不能**在 useState 初值里读 localStorage——SSR 时它不存在，
+  // 服务端兜底成 [] / standard，客户端首帧 hydration 读到真值 → 两侧 HTML 不一致，
+  // React  hydration 报错、且难度徽章会从「寻常」闪成真实档位（静态审查实测）。
+  // 照 useLocale 的做法：首帧给无害默认值，挂载后再读本机。
+  const [onboardDone, setOnboardDone] = useState<OnboardingStepId[]>([]);
+  const [courtId, setCourtId] = useState(() => difficulty('standard'));
+  useEffect(() => {
+    try {
+      const raw: unknown = JSON.parse(localStorage.getItem('shijing-onboard-v1') || '[]');
+      setOnboardDone(Array.isArray(raw) ? raw.filter((x): x is OnboardingStepId => ONBOARDING_STEPS.some(step => step.id === x)) : []);
+    } catch { /* 隐私模式下就当没做过引导 */ }
+    try { setCourtId(difficulty(localStorage.getItem('shijing-difficulty-v1') || 'standard')); } catch { /* 同上 */ }
+  }, []);
   const log = useRef<HTMLDivElement>(null);
   const runId = useRef('');
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -163,27 +188,32 @@ export default function PlayScreen() {
   }
 
   async function decide(choiceId: string) {
-    if (!view) return; setBusy(true); setError('');
+    if (!view) return;
+    if (s?.verdict?.over) return; // 终局后地图上的待决卡/国策/省政不该还能点 setBusy(true); setError('');
     try { setView(await api<View>(`runs/${view.id}/decision`, { commandId: crypto.randomUUID(), expectedRevision: view.strategy?.revision ?? view.world.version, choiceId })); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   async function adoptFocus(focusId: string) {
-    if (!view) return; setBusy(true); setError('');
+    if (!view) return;
+    if (s?.verdict?.over) return; // 终局后地图上的待决卡/国策/省政不该还能点 setBusy(true); setError('');
     try { setView(await api<View>(`runs/${view.id}/focus`, { commandId: crypto.randomUUID(), expectedRevision: view.strategy?.revision ?? view.world.version, focusId })); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   async function adoptTech(techId: string) {
-    if (!view) return; setBusy(true); setError('');
+    if (!view) return;
+    if (s?.verdict?.over) return; // 终局后地图上的待决卡/国策/省政不该还能点 setBusy(true); setError('');
     try { setView(await api<View>(`runs/${view.id}/tech`, { commandId: crypto.randomUUID(), expectedRevision: view.strategy?.revision ?? view.world.version, techId })); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   async function decideWhatIf(cardId: string, choiceId: string) {
-    if (!view) return; setBusy(true); setError('');
+    if (!view) return;
+    if (s?.verdict?.over) return; // 终局后地图上的待决卡/国策/省政不该还能点 setBusy(true); setError('');
     try { setView(await api<View>('runs/' + view.id + '/whatif', { commandId: crypto.randomUUID(), expectedRevision: view.strategy?.revision ?? view.world.version, cardId, choiceId })); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   async function updateProvince(provinceId: string, patch: { governorName?: string; mode?: string; policy?: string }) {
-    if (!view) return; setBusy(true); setError('');
+    if (!view) return;
+    if (s?.verdict?.over) return; // 终局后地图上的待决卡/国策/省政不该还能点 setBusy(true); setError('');
     try { setView(await api<View>(`runs/${view.id}/province-update`, { commandId: crypto.randomUUID(), expectedRevision: view.world.version, provinceId, reason: '玩家在省政面板交付', ...patch })); markOnboard('set-policy'); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
@@ -193,8 +223,14 @@ export default function PlayScreen() {
     catch (e) { setError((e as Error).message); }
   }
   async function loadSlots() { try { setSlots((await api<{ slots: SaveSlotView[] }>('saves')).slots); } catch { /* 存档列表失败只让面板空着 */ } }
+  /** DELETE 单独一个助手：api() 只在有 body 时才选 POST，清空槽位必须显式 DELETE
+      （曾用 api(path, undefined) 发成 GET，404 还被 catch 吞掉，槽位看着毫无变化）。 */
+  async function del(path: string): Promise<void> {
+    const res = await fetch('/api/agents/' + path, { method: 'DELETE', signal: AbortSignal.timeout(20000) });
+    if (!res.ok) throw new Error((await res.json() as { error?: string }).error || t(locale, 'error.http', { status: res.status }));
+  }
   async function refreshAchv() { try { const r = await api<AchievementsView & { newlyUnlocked: { name: string }[] }>(`runs/${runId.current}/achievements`); setAchv(r); showToast(r.newlyUnlocked.map(a => t(locale, 'save.unlocked', { name: a.name }))); } catch { /* 无成就可算时不打扰 */ } }
-  async function saveToSlot(slot: number) { if (!view) return; setBusy(true); setSaveNote(''); try { const r = await api<{ slot: SaveSlotView }>('saves', { slot, runId: view.id }); setSlots(p => p.map(s => s.slot === slot ? r.slot : s)); setSaveNote(t(locale, 'save.saved', { slot, title: r.slot.title, day: Math.floor(r.slot.elapsedDays) + 1 })); } catch (e) { setSaveNote((e as Error).message); } finally { setBusy(false); } }
+  async function saveToSlot(slot: number) { if (!view) return; setBusy(true); setSaveNote(''); try { const r = await api<{ slot: SaveSlotView }>('saves', { slot, runId: view.id, court: courtId.name }); setSlots(p => p.map(s => s.slot === slot ? r.slot : s)); setSaveNote(t(locale, 'save.saved', { slot, title: r.slot.title, day: Math.floor(r.slot.elapsedDays) + 1 })); } catch (e) { setSaveNote((e as Error).message); } finally { setBusy(false); } }
   async function loadFromSlot(slot: number) {
     if (!view) return; setBusy(true);
     try {
@@ -203,7 +239,11 @@ export default function PlayScreen() {
       else location.href = '/play?run=' + encodeURIComponent(r.entry.gameId);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
-  async function clearSlot(slot: number) { setBusy(true); try { await api(`saves/${slot}`, undefined); setSlots(p => p.map(s => s.slot === slot ? { ...s, gameId: '', title: '', savedAt: '', revision: 0, elapsedDays: 0, court: '', auto: false } : s)); } catch { /* 忽略 */ } finally { setBusy(false); } }
+  async function clearSlot(slot: number) {
+    setBusy(true); setSaveNote('');
+    try { await del(`saves/${slot}`); setSlots(p => p.map(s => s.slot === slot ? { ...s, gameId: '', title: '', savedAt: '', revision: 0, elapsedDays: 0, court: '', auto: false } : s)); setSaveNote(t(locale, 'save.cleared', { slot })); }
+    catch (e) { setSaveNote((e as Error).message); } finally { setBusy(false); }
+  }
 
   const s = view?.strategy;
   const day = s ? Math.floor(s.worldTime.elapsedDays) + 1 : 0;
@@ -217,7 +257,6 @@ export default function PlayScreen() {
   const goal = s?.goal;
   const alarms = s?.alarms ?? [];
   const canOrder = view?.mode === 'engine' || !!s?.localSimulation;
-  const courtId = difficulty((() => { try { return localStorage.getItem('shijing-difficulty-v1') || 'standard'; } catch { return 'standard'; } })());
   const next = nextStep(onboardDone);
 
   const drawer = useCallback(() => {
@@ -231,9 +270,10 @@ export default function PlayScreen() {
       case 'province': return s.provinces ? <ProvincePanel provinces={s.provinces} onUpdate={(id, p) => void updateProvince(id, p)} busy={busy} /> : null;
       // 外交面板吃的是引擎的 DiplomaticState（不是投影视图），按需拉一次原始世界；
       // 不跟着 2.5s 轮询走——那是上百 KB 的原始快照，为一个面板每分钟拉 24 次不值得。
-      case 'diplomacy': return rawDiplomacy?.state ? <DiplomacyPanel state={rawDiplomacy.state} playerFactionId={rawDiplomacy.me} /> : <p className="play-pane-note">{rawDiplomacy ? t(locale, 'play.noDiplomacy') : t(locale, 'play.loading')}</p>;
+      case 'diplomacy': return rawWorld?.diplomacy && rawWorld.simulation?.playerFactionId ? <DiplomacyPanel state={rawWorld.diplomacy} playerFactionId={rawWorld.simulation.playerFactionId} /> : <p className="play-pane-note">{rawWorld ? t(locale, 'play.noDiplomacy') : t(locale, 'play.loading')}</p>;
       case 'fog': return <FogPanel data={s} />;
-      case 'stratagem': return <StratagemPanel />;
+      // 计策面板的资格判定（eligibility）要读本方军队与城池，必须给真世界快照
+      case 'stratagem': return <StratagemPanel world={rawWorld} />;
       case 'chronicle': return <ChroniclePanel changes={s.changes || []} onClose={() => setPanel(null)} onboarding={next} />;
       case 'court': return <section className="play-pane play-court" aria-label={t(locale, 'play.dock.court')}>
         <h2>{t(locale, 'play.dock.court')}</h2>
@@ -243,26 +283,25 @@ export default function PlayScreen() {
         <p className="play-pane-note">{t(locale, 'play.courtHint')}</p>
         <a className="play-court-link" href={'/discussion?run=' + encodeURIComponent(view.id)}>{t(locale, 'play.courtOpen')}</a>
       </section>;
-      case 'saves': return <SaveSlotsPanel tab="saves" onTab={() => { }} slots={slots} achv={achv} busy={busy} note={saveNote} onSaveSlot={x => void saveToSlot(x)} onLoadSlot={x => void loadFromSlot(x)} onClearSlot={x => void clearSlot(x)} onRefresh={() => void refreshAchv()} onClose={() => setPanel(null)} />;
+      case 'saves': return <SaveSlotsPanel tab={saveTab} onTab={setSaveTab} slots={slots} achv={achv} busy={busy} note={saveNote} onSaveSlot={x => void saveToSlot(x)} onLoadSlot={x => void loadFromSlot(x)} onClearSlot={x => void clearSlot(x)} onRefresh={() => void refreshAchv()} onClose={() => setPanel(null)} />;
       default: return null;
     }
-  }, [view, panel, s, busy, locale, next, slots, achv, saveNote, rawDiplomacy]);
+  }, [view, panel, s, busy, locale, next, slots, achv, saveNote, rawWorld]);
 
-  // 外交面板按需拉一次原始世界（DiplomacyPanel 吃引擎的 DiplomaticState + 玩家阵营 id，
-  // 都不是投影视图里的形状）。拉过一次就缓存：一局之内外交结构不会因轮询而需要刷新，
+  // 外交/计策面板按需拉一次原始世界：DiplomacyPanel 吃引擎的 DiplomaticState + 玩家阵营 id，
+  // StratagemPanel 的资格判定要吃本方军队与城池（eligibility 直接读 WorldSnapshot）——
+  // 这两样都不是投影视图里的形状。拉过一次就缓存：一局之内结构不会因轮询而需要刷新，
   // 玩家重开会自动失效（组件重挂）。
+  // 曾经在这里传 `{} as never` 给 eligibility，玩家一输「火攻」就 TypeError 白屏整页
+  // （placeholder 里写的词必然命中关键词）——所以必须给真快照。
   useEffect(() => {
-    if (panel !== 'diplomacy' || rawDiplomacy || !runId.current) return;
+    if ((panel !== 'diplomacy' && panel !== 'stratagem') || rawWorld || !runId.current) return;
     let alive = true;
-    void api<{ world: { diplomacy?: import('../../agents/src/diplomacy').DiplomaticState; simulation?: { playerFactionId?: string } } | null }>(`runs/${runId.current}/world`)
-      .then(r => {
-        if (!alive) return;
-        const me = r.world?.simulation?.playerFactionId;
-        setRawDiplomacy(r.world?.diplomacy && me ? { state: r.world.diplomacy, me } : null);
-      })
-      .catch(() => { if (alive) setRawDiplomacy({ state: null, me: '' }); });
+    void api<{ world: import('../../agents/src/world-contracts').WorldSnapshot | null }>(`runs/${runId.current}/world`)
+      .then(r => { if (alive) setRawWorld(r.world ?? null); })
+      .catch(() => { if (alive) setRawWorld(null); });
     return () => { alive = false; };
-  }, [panel, rawDiplomacy]);
+  }, [panel, rawWorld]);
 
   if (!view) return <main className="play-boot" aria-busy="true"><p>{status || t(locale, 'play.loading')}</p><a href="/">{t(locale, 'play.backLauncher')}</a></main>;
 
@@ -302,7 +341,7 @@ export default function PlayScreen() {
 
       {/* 侧栏图标轨：点哪域开哪域（P 社 outliner 逻辑） */}
       <nav className="play-dock" aria-label={t(locale, 'play.dockAria')}>
-        {PANELS.map(k => <button key={k} type="button" className={panel === k ? 'selected' : ''} aria-pressed={panel === k} onClick={() => setPanel(panel === k ? null : k)} title={t(locale, `play.dock.${k}`)}>
+        {PANELS.map(k => <button key={k} type="button" className={panel === k ? 'selected' : ''} aria-pressed={panel === k} onClick={() => openPanel(k)} title={t(locale, `play.dock.${k}`)}>
           <span aria-hidden="true">{t(locale, `play.dockIcon.${k}`)}</span>{t(locale, `play.dock.${k}`)}
           {k === 'power' && alarms.length > 0 && <i className="play-dock-badge">{alarms.length}</i>}
         </button>)}
@@ -319,23 +358,27 @@ export default function PlayScreen() {
     <footer className="play-command">
       <form onSubmit={e => { e.preventDefault(); void submit(); }} className="play-cmd-form">
         <label className="sr-only" htmlFor="play-cmd">{t(locale, 'discussion.input')}</label>
-        <input id="play-cmd" value={text} onChange={e => setText(e.target.value)} disabled={busy || !!s?.verdict?.over} placeholder={t(locale, 'play.cmdPlaceholder')} />
+        <input id="play-cmd" value={text} onChange={e => setText(e.target.value)} disabled={busy || !!s?.verdict?.over || !canOrder} placeholder={t(locale, 'play.cmdPlaceholder')} />
         {canOrder && <label className="play-act"><input type="checkbox" checked={act} onChange={e => setAct(e.target.checked)} disabled={busy} />{t(locale, 'discussion.actionHint')}</label>}
         <button type="submit" disabled={busy || !text.trim() || !!s?.verdict?.over}>{t(locale, 'common.send')}</button>
       </form>
       <div className="play-time" role="group" aria-label={t(locale, 'play.timeAria')}>
         <label className="sr-only" htmlFor="play-jump">{t(locale, 'discussion.jumpTo')}</label>
-        <input id="play-jump" type="number" min={1} max={3650} value={jumpDay} onChange={e => setJumpDay(e.target.value)} disabled={busy || !!s?.verdict?.over} placeholder={String(day)} />
-        <button type="button" disabled={busy || !!s?.verdict?.over} onClick={() => void jump()}>{t(locale, 'discussion.jumpSubmit')}</button>
-        <button type="button" disabled={busy || !!s?.verdict?.over} onClick={() => void jump(day + 30)}>{t(locale, 'discussion.jump30')}</button>
-        <button type="button" disabled={busy || !!s?.verdict?.over} onClick={() => void jump(day + 365)}>{t(locale, 'discussion.jumpYear')}</button>
-        <button type="button" disabled={busy || !!s?.verdict?.over} onClick={() => void advance(24)}>{t(locale, 'play.advance1')}</button>
+        <input id="play-jump" type="number" min={1} max={3650} value={jumpDay} onChange={e => setJumpDay(e.target.value)} disabled={busy || !!s?.verdict?.over || !canOrder} placeholder={String(day)} />
+        <button type="button" disabled={busy || !!s?.verdict?.over || !canOrder} onClick={() => void jump()}>{t(locale, 'discussion.jumpSubmit')}</button>
+        <button type="button" disabled={busy || !!s?.verdict?.over || !canOrder} onClick={() => void jump(day + 30)}>{t(locale, 'discussion.jump30')}</button>
+        <button type="button" disabled={busy || !!s?.verdict?.over || !canOrder} onClick={() => void jump(day + 365)}>{t(locale, 'discussion.jumpYear')}</button>
+        <button type="button" disabled={busy || !!s?.verdict?.over || !canOrder} onClick={() => void advance(24)}>{t(locale, 'play.advance1')}</button>
       </div>
       {note && <p className="play-note" role="status">{note}</p>}
       {error && <p className="play-error" role="alert">{error}</p>}
+      {/* 无推演的独立局：把「这一局只能问对与阅览」说清楚，别让玩家对着一排灰按钮猜 */}
+      {!canOrder && view?.mode === 'standalone' && !!s?.ready && <p className="play-note" role="note">{t(locale, 'discussion.readingRoomNote')}</p>}
     </footer>
 
-    {view && <MajorEventScreen runId={view.id} jobs={view.jobs ?? []} onRetry={() => void api(`jobs/${runId.current}/retry`, {})} open={eventsOpen} onClose={() => setEventsOpen(false)} />}
+    {/* onRetry 要的是 jobId 而不是 runId——sidecar 的路由是 jobs/:jobId/retry，
+        传 runId 过去打中的不是这个任务。 */}
+    {view && <MajorEventScreen runId={view.id} jobs={view.jobs ?? []} onRetry={(job: Job) => void api('jobs/' + job.id + '/retry', {})} open={eventsOpen} onClose={() => setEventsOpen(false)} />}
     {exportOpen && record && <ChronicleExport record={record} onClose={() => setExportOpen(false)} />}
     {s?.verdict?.over && <div className={`play-verdict verdict-${s.verdict.outcome}`} role="status">
       <b>{s.verdict.outcome === 'victory' ? t(locale, 'discussion.verdictVictory') : t(locale, 'discussion.verdictDefeat')}</b>

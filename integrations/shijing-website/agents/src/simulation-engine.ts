@@ -194,7 +194,11 @@ function installOrder(w:WorldSnapshot,input:SimulationCommand,r:SimulationReport
   m.roadId=null;m.roadKm=0;m.atCityId=target;a.location={kind:'city',cityId:target};a.status='resting';
  }else{a.status=m.atCityId&&w.cities[m.atCityId].ownerFactionId===a.factionId?'resting':input.kind==='besiege'?'besieging':'resting';}
  for(const e of input.effects||[])m.effects.push({id:e.id,parameter:'navigation',factor:e.factor,roadId:e.roadId,expiresHour:s.timeHours+e.durationHours,group:'navigation'});
- r.summaries.push(w.decisions[id].title+'，命令已记录；尚未推进时间。');
+ // 汇报只给玩家自己下的令：AI 自动补粮（本函数下方 273 行起）与 auto-hold 的例行驻守
+ // 都不进起居注——敌方守军每天被喂一遍粮、每天重新「驻守休整」一次，写出来就是同一行
+ // 刷一百遍，把玩家自己的断粮/交战信息全盖掉（QA 实测的噪声）。账照记（决策簿与台账
+ // 都要能查「这道令是谁下的」），只是不给玩家看。
+ if(!automatic)r.summaries.push(w.decisions[id].title+'，命令已记录；尚未推进时间。');
 }
 /**
  * 第 5 轮卡点1：驻地能送到粮的那条路。在路上 = 脚下这条路；围在敌城下/驻在城里 =

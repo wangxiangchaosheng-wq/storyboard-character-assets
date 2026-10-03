@@ -161,6 +161,90 @@ test('第 7 轮：粜粮济民——城粮换朝望与寒门认可，留 1 万�
  // 敌城不可粜
  assert.throws(()=>agent.sellGrain(id,{commandId:'r7-sell-3',expectedRevision:agent.getWorld(id).revision,cityId:'changan',amountKg:50000}),/只能粜己方/);
 });
+// BUG-001（QA 实测复现，严重）：粜粮只减城粮不记总账 → 守恒式破洞 → 此后**每一个**写操作
+// （军令/推进/省政/外交）都被 assertWorldFoodBalance 硬顶回 400「粮草收支不守恒」，整局锁死。
+// 判据：粜粮之后四类写必须照旧成功，且守恒式仍然成立。
+test('BUG-001：粜粮记入消耗总账——粜完之后军令/推进/省政/外交照旧能写，守恒式不破',t=>{
+ const {agent,id}=setup(t); // setup 已裁掉开局决策卡
+ const bump=agent.getWorld(id);
+ // 直接抬城粮必须同步抬 initialFoodKg（守恒式的另一半），否则测试自己先把账本捅破。
+ // 抬多少按实际差算——成都原存只有 2 万公斤，别把 30 万当成「加了 10 万」。
+ const original=bump.cities.chengdu.foodKg;
+ bump.cities.chengdu.foodKg=300000;bump.simulation.ledger.initialFoodKg=round(bump.simulation.ledger.initialFoodKg+(300000-original));
+ agent.store.transaction(()=>{agent.store.db.prepare('UPDATE world_states SET payload=? WHERE run_id=?').run(JSON.stringify(bump),id);agent.mirror(id,bump);});
+ const sold=agent.sellGrain(id,{commandId:'sell-ledger-1',expectedRevision:agent.getWorld(id).revision,cityId:'chengdu',amountKg:100000});
+ balance(agent.getWorld(id));
+ // 总账里必须真有一次 10 万公斤的消耗（此刻还没做别的写，所以精确相等）
+ assert.equal(agent.getWorld(id).simulation.ledger.consumedKg,100000,'粜出的 10 万公斤进消耗账');
+ // 四类写：军令 / 推进 / 省政 / 外交——修复前它们全部 400「粮草收支不守恒」
+ assert.doesNotThrow(()=>agent.localOrder(id,{commandId:'sell-order-1',expectedRevision:agent.getWorld(id).revision,armyId:'army-wei-yan',kind:'march',targetCityId:'changan'}),'军令应仍可下达');
+ assert.doesNotThrow(()=>agent.localAdvance(id,{commandId:'sell-adv-1',expectedRevision:agent.getWorld(id).revision,hours:24}),'推进应仍可进行');
+ assert.doesNotThrow(()=>agent.updateProvince(id,{commandId:'sell-prov-1',expectedRevision:agent.getWorld(id).revision,provinceId:Object.keys(agent.getWorld(id).provinces||{})[0],policy:'屯田',reason:'玩家在省政面板交付'}),'省政应仍可交付');
+ assert.doesNotThrow(()=>agent.diplomacy(id,{commandId:'sell-dipl-1',expectedRevision:agent.getWorld(id).revision,action:'war',targetFactionId:'wu'}),'外交应仍可进行');
+ balance(agent.getWorld(id)); // 经过这些写之后世界仍然守恒
+});
+
+// 第 7 轮：写入口幂等重放的指纹口径。落库处 commitLocal 记的是
+// digest({kind:'decision',input:{commandId,expectedRevision,choiceId}})，所以「同编号重放」
+// 要么兑现（指纹一致 → alreadyApplied），要么撞「相同请求编号对应不同内容」——两条都要求
+// **世界一个字节都不动**：点数/粮草不二次结算。decide 与 sellGrain 已把 pre-check 口径
+// 对齐到 decision（见 decide 与 sellGrain 源码注释）；加急两个入口今天还没对齐，
+// 照原样重试也落 409——本文件把现状逐条钉住，修好后改期望值即可。
+test('第 7 轮：国策加急重放——同编号任何版本都不得二次结算；换 expectedRevision 与照原样重放今天同为 409（已知口径未对齐）',t=>{
+ const {agent,id}=setup(t);
+ agent.adoptFocus(id,{commandId:'r7-adopt',expectedRevision:agent.getWorld(id).revision,focusId:'focus-military-drill'});
+ const rev=agent.getWorld(id).revision;
+ const exp=agent.expediteFocus(id,{commandId:'r7-exp',expectedRevision:rev,focusId:'focus-military-drill'});
+ assert.equal(exp.cost,15,'PP_START 20 − 采纳 5 = 15 点，1 点 1 日');
+ assert.equal(exp.daysCut,15);
+ const w=agent.getWorld(id),entry=w.focuses.active.find(a=>a.focusId==='focus-military-drill');
+ assert.equal(w.focuses.points,0,'加急花光剩余政治点');
+ assert.ok(entry.endsDay<20,'工期被缩短');
+ // 同编号重放：expectedRevision 换不换，今天都撞指纹关（pre-check 用的是
+ // digest({kind:'focus-expedite',input})，与落库的 kind:'decision' 口径永远不相等）——
+ // 误导性的 409 是已知缺陷；安全侧必须成立：世界不动，点数不二次扣。
+ for(const expectedRevision of [rev,rev+99]){
+  assert.throws(()=>agent.expediteFocus(id,{commandId:'r7-exp',expectedRevision,focusId:'focus-military-drill'}),/相同请求编号对应不同内容/,`expectedRevision=${expectedRevision} 的重放必须在落库前被挡下`);
+  assert.deepEqual(agent.getWorld(id),w,'被挡下的重放不许改动世界');
+ }
+ // 新编号配旧版本：走版本乐观锁，文案不是指纹 mismatch
+ assert.throws(()=>agent.expediteFocus(id,{commandId:'r7-exp-2',expectedRevision:rev,focusId:'focus-military-drill'}),/世界版本已变化/);
+});
+
+test('第 7 轮：科技加急重放同口径（TP_START 40 − 新律 25 = 15 点）',t=>{
+ const {agent,id}=setup(t);
+ agent.adoptTech(id,{commandId:'r7-tadopt',expectedRevision:agent.getWorld(id).revision,techId:'tech-xinlv'});
+ const rev=agent.getWorld(id).revision;
+ const exp=agent.expediteTech(id,{commandId:'r7-texp',expectedRevision:rev,techId:'tech-xinlv'});
+ assert.equal(exp.cost,15);
+ assert.equal(exp.daysCut,15);
+ const w=agent.getWorld(id),entry=w.techs.active.find(a=>a.techId==='tech-xinlv');
+ assert.equal(w.techs.points,0,'加急花光剩余科技点');
+ assert.ok(entry.endsDay<40,'工期被缩短');
+ for(const expectedRevision of [rev,rev+1]){
+  assert.throws(()=>agent.expediteTech(id,{commandId:'r7-texp',expectedRevision,techId:'tech-xinlv'}),/相同请求编号对应不同内容/);
+  assert.deepEqual(agent.getWorld(id),w,'被挡下的重放不许改动世界');
+ }
+ assert.throws(()=>agent.expediteTech(id,{commandId:'r7-texp-2',expectedRevision:rev,techId:'tech-xinlv'}),/世界版本已变化/);
+});
+
+// 对照面：粜粮的 pre-check 已与 decision 落库口径对齐（源码里有专注释），
+// 所以同编号**同版本**重放兑现 alreadyApplied，同编号换 expectedRevision 才判不同内容。
+test('第 7 轮：粜粮重放（已对齐口径）——同编号同版本幂等兑现，换 expectedRevision 判不同内容',t=>{
+ const {agent,id}=setup(t);
+ const bump=agent.getWorld(id);bump.cities.chengdu.foodKg=300000;
+ agent.store.transaction(()=>{agent.store.db.prepare('UPDATE world_states SET payload=? WHERE run_id=?').run(JSON.stringify(bump),id);agent.mirror(id,bump);});
+ const rev=agent.getWorld(id).revision;
+ agent.sellGrain(id,{commandId:'r7-resell',expectedRevision:rev,cityId:'chengdu',amountKg:100000});
+ const sold=agent.getWorld(id);
+ assert.equal(sold.cities.chengdu.foodKg,200000,'前置：粜后余 20 万');
+ const again=agent.sellGrain(id,{commandId:'r7-resell',expectedRevision:rev,cityId:'chengdu',amountKg:100000});
+ assert.equal(again.alreadyApplied,true,'同编号同版本：幂等兑现');
+ assert.equal(agent.getWorld(id).cities.chengdu.foodKg,200000,'重放不二次粜粮');
+ assert.throws(()=>agent.sellGrain(id,{commandId:'r7-resell',expectedRevision:rev+2,cityId:'chengdu',amountKg:100000}),/相同请求编号对应不同内容/);
+ assert.equal(agent.getWorld(id).cities.chengdu.foodKg,200000,'被挡下的重放不动城粮');
+ assert.throws(()=>agent.sellGrain(id,{commandId:'r7-resell-2',expectedRevision:rev,cityId:'chengdu',amountKg:100000}),/世界版本已变化/);
+});
 test('capture occurs only after defenders surrender and occupying army enters',()=>{let w=atChangan(fixture());w.armies['army-changan'].morale=5;w=issueOrder(w,order(w,'attack')).world;const r=advanceWorld(w,advance(w,1));assert.equal(r.world.cities.changan.ownerFactionId,'shu');assert.equal(r.world.armies['army-wei-yan'].location.kind,'city');assert.equal(r.world.simulation.armies['army-changan'].captured,3300);assert.equal(r.world.cities.changan.foodKg,50000);balance(r.world);});
 test('full replay survives database restart, stale writes, duplicate requests and raw settlement rejection',t=>{const {agent,id,dir}=setup(t);const first=order(agent.getWorld(id));agent.localOrder(id,first);const input=advance(agent.getWorld(id));agent.localAdvance(id,input);const state=agent.getWorld(id);assert.equal(agent.localAdvance(id,input).alreadyApplied,true);assert.deepEqual(agent.getWorld(id),state);assert.throws(()=>agent.localAdvance(id,{...input,commandId:'stale'}),/版本/);assert.throws(()=>agent.localAdvance(id,{...input,hours:12}),/不同内容/);const second=new Store(dir);try{const other=new WorldAgent(second);assert.deepEqual(other.getWorld(id),state);assert.equal(other.localOrder(id,first).alreadyApplied,true);}finally{second.close();}assert.throws(()=>agent.applySettlement(id,{settlementId:'patch',expectedRevision:state.revision,decisionId:null,source:'referee',elapsedDays:1,title:'x',summary:'x',mutations:[]}),/禁止/);balance(state);});
 test('strict command parser never interprets questions or negations as orders',()=>{const w=fixture();for(const text of ['不要魏延进攻长安','魏延如果进攻长安','魏延进攻长安吗','魏延进攻长安，然后增加兵力'])assert.throws(()=>parseLocalCommand(w,text,'cmd'));assert.equal(parseLocalCommand(w,'魏延 进攻 长安','cmd').input.kind,'attack');assert.equal(parseLocalCommand(w,'推进 2 天','cmd').input.hours,48);});

@@ -680,6 +680,12 @@ export class WorldAgent implements WorldStateService {
       assert(city.ownerFactionId===world.simulation!.playerFactionId,'只能粜己方城池的粮',403);
       assert(city.foodKg-input.amountKg>=10000,`${city.name}仓中存粮不足：现储 ${Math.round(city.foodKg)} 公斤，粜后须留 1 万公斤底仓`,409);
       city.foodKg=round(city.foodKg-input.amountKg);
+      // 粜出去的粮必须记进总账的消耗项：消耗账本是守恒式的另一半
+      // （foodTotal + consumedKg + spoiledKg − initialFoodKg = 0，simulation-state.ts 的
+      //  assertWorldFoodBalance 在每个写路径前都查）。只减城粮不记账，守恒式立刻破一个洞，
+      // 此后**这个局的每一个写操作**（军令/推进/跳转/省政/外交）都会被自己的校验硬顶回
+      // 400「粮草收支不守恒」——整局锁死，且玩家看到的是一句内部账本术语（QA 实测复现）。
+      world.simulation!.ledger.consumedKg=round(world.simulation!.ledger.consumedKg+input.amountKg);
       world.revision++;
       const gain=Math.min(5,Math.floor(input.amountKg/25000));
       let prestigeLine='';

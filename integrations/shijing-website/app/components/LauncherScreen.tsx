@@ -57,6 +57,9 @@ export default function LauncherScreen() {
 
   /** 建局并入场。spec 直建不接付费生成，离线可玩。 */
   const startScenario = useCallback(async (scenarioId: string, difficultyId: string) => {
+    // 连点「开局」只能建一局：starting 是同步置的，第二次进来直接挡住，
+    // 否则两次 POST /runs 会建出两个对局（第二个成孤儿）。
+    if (starting) return;
     const scenario: ScenarioPreset | undefined = SCENARIOS.find(s => s.id === scenarioId);
     if (!scenario) { setStartError(t(locale, 'launcher.error.noScenario')); return; }
     setStarting(true); setStartError('');
