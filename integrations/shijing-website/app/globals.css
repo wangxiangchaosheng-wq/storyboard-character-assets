@@ -846,7 +846,12 @@ button:disabled{cursor:default}
    深色 chrome + 地图常满屏；顶栏给时间与国力，侧轨一条图标轨点开各域
    （停在图上、不遮全屏），底部指令栏随时能说话。
    ══════════════════════════════════════════════════════════════════ */
-.play{background:#12160f;color:#d8cfae;min-height:100svh;display:flex;flex-direction:column;font-family:Songti SC,STSong,Noto Serif CJK SC,serif;overflow:hidden}
+/* height 而不是 min-height：min-height 允许 flex 列长出视口，溢出部分被 overflow:hidden
+   静静切掉——实测 720px 高的窗里顶栏 44 + 地图 644 + 指令栏 90 = 778，整条指令栏
+   （推进/跳转按钮）掉到首屏外点不到。height:100svh 让三段精确分掉视口，地图按
+   aspect-ratio 在剩余高度里收宽。 */
+.play{background:#12160f;color:#d8cfae;height:100svh;display:flex;flex-direction:column;font-family:Songti SC,STSong,Noto Serif CJK SC,serif;overflow:hidden}
+.play-body{flex:1;display:flex;min-height:0}
 .play-boot{background:#12160f;color:#d8cfae;min-height:100svh;display:grid;place-content:center;gap:14px;justify-items:center;font-family:Songti SC,STSong,Noto Serif CJK SC,serif}
 .play-boot a{color:#d8b06a}
 /* 顶栏 */
@@ -866,9 +871,21 @@ button:disabled{cursor:default}
    时 `.play-map` 的 flex:1 自然收窄，地图重新居中，谁都不挡谁。 */
 .play-body{flex:1;display:flex;min-height:0}
 .play-map{flex:1;min-width:0;display:flex;align-items:stretch;justify-content:center;background:#0d1109}
-.play-map .strategy-overlay{position:relative;inset:auto;flex:1;background:0 0;width:100%}
-/* 地图铺满中段：高度余量按顶栏+底栏实占（约 172px）算，别把地图缩成中间一条 */
-.play-map .strategy-scroll{width:min(100%,calc((100svh - 172px)*1725/941));margin:auto}
+.play-map .strategy-overlay{position:relative;inset:auto;flex:1;background:0 0;width:100%;min-height:0}
+/*
+ * 地图铺满中段：**让 flex 自己算，别再手推像素**。
+ *
+ * 原写法 width:min(100%,calc((100svh - 172px)*1725/941)) 有两个硬伤：
+ *  ① 172px 是对「顶栏+底栏实占」的猜测，而顶栏 flex-wrap（目标徽章/告警按钮/语言/存档/导出
+ *     一栏挤着）、告警条、note/error 行、时间按钮换行都会让真实可用高度变小——地图按偏大的
+ *     宽度渲染，底部被 .play 的 overflow:hidden 切掉（交州/会稽一带城池与图右待决卡），
+ *     推进按钮折出屏外点不到；
+ *  ② 941 是过期常数（舆图画布是 1725×863），且这条二级选择器把
+ *     @media(max-width:700px){.strategy-scroll{width:100vw}} 压成死规则。
+ * 改成 height:100% + aspect-ratio + max-width:100%：高度撑满中段、宽度按 1725:863 反推，
+ * 宽不过容器时浏览器按同比例收高度——顶栏折几行都不用改一个数。
+ */
+.play-map .strategy-scroll{height:100%;width:auto;max-width:100%;max-height:100%;aspect-ratio:1725/863;margin:auto}
 /* 侧轨 */
 .play-dock{flex:none;width:96px;display:flex;flex-direction:column;gap:2px;padding:8px 6px;background:#1a1f15;border-left:1px solid #2c3324;overflow-y:auto}
 .play-dock button{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;border:1px solid transparent;border-radius:8px;background:0 0;color:#9a917a;padding:8px 2px 6px;font-size:12px;cursor:pointer;font-family:inherit;line-height:1.2}

@@ -64,6 +64,10 @@ export default function PlayScreen() {
   const [locale] = useLocale();
   const [view, setView] = useState<View | null>(null);
   const [error, setError] = useState('');
+  // view 的 ref 镜像：轮询比对要用。tick 的闭包在挂载时就建好了（deps 为 []），直接读
+  // view state 只会永远拿到 null，所以用一份 ref 跟随后续每次渲染同步最新值。
+  const viewRef = useRef<View | null>(null);
+  useEffect(() => { viewRef.current = view; }, [view]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(() => t(locale, 'play.loading'));
   const [panel, setPanel] = useState<Panel | null>(null);
@@ -127,8 +131,19 @@ export default function PlayScreen() {
       catch (e) { if (alive) setStatus((e as Error).message); }
     }
     void boot();
-    // 2.5s 轮询与廷议页同口径：世界在被 AI 代决、任务在后台推进，地图要能自己跟上
-    const tick = () => { void api<View>('runs/' + id).then(v => { if (alive) { setView(v); setError(''); } }).catch(() => { /* 单次失败交给下一次 */ }).finally(() => { if (alive) timer = setTimeout(tick, 2500); }); };
+    // 2.5s 轮询与廷议页同口径：世界在被 AI 代决、任务在后台推进，地图要能自己跟上。
+    // 但**不能每轮都无脑 setView(整个 view)**：响应体本身 338KB（200 日），且换一次对象
+    // 引用 React 必重渲染，StrategyScreen 整棵地图树跟着 diff——本页最贵的部分。
+    // 所以拉回来先跟当前 view 比 world.version 与 strategy.revision：没变就保留原对象，
+    // React 直接跳过这棵子树；错误提示也只在「真的拿到新版本」时才清——从前无条件
+    // setError('')，玩家刚看到的一条 409（版本锁冲突/终局禁止操作）会在下一个 2.5s tick
+    // 被下一次空轮询抹掉，看不出是谁报的错。
+    const tick = () => { void api<View>('runs/' + id).then(v => {
+      if (!alive) return;
+      const cur = viewRef.current;
+      const changed = !cur || cur.world.version !== v.world.version || cur.strategy?.revision !== v.strategy?.revision;
+      if (changed) { setError(''); setView(v); }
+    }).catch(() => { /* 单次失败交给下一次 */ }).finally(() => { if (alive) timer = setTimeout(tick, 2500); }); };
     timer = setTimeout(tick, 2500);
     return () => { alive = false; clearTimeout(timer); };
   }, []);

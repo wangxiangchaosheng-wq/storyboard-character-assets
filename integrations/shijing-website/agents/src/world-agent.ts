@@ -189,8 +189,15 @@ export class WorldAgent implements WorldStateService {
   }
   /** Startup migration only; GET never initializes or advances a world. */
   bootstrapPendingRuns():number {
-    const rows=this.store.db.prepare('SELECT id FROM runs').all();let count=0;
-    for(const row of rows)this.store.transaction(()=>{const id=String(row.id);if(this.bootstrapRunInTransaction(this.store.run(id)))count++;const world=this.getWorld(id);if(world)this.archiveStrategies(world);});
+    const rows=this.store.db.prepare('SELECT id FROM runs').all();let count=0;const broken:string[]=[];
+    for(const row of rows){
+      const id=String(row.id);
+      try{this.store.transaction(()=>{if(this.bootstrapRunInTransaction(this.store.run(id)))count++;const world=this.getWorld(id);if(world)this.archiveStrategies(world);});}
+      // 坏局隔离：一个对局的存档损坏（实测生产库 439 局里 17 局的 simulation profile 是坏的）
+      // 不能让整个服务起不来。跳过它、记账、继续——其余局照常能玩。
+      catch(e){broken.push(id+': '+(e instanceof Error?e.message:String(e)));}
+    }
+    if(broken.length){console.warn(`[bootstrap] ${broken.length} 个对局的存档损坏，已跳过（不影响其它对局）：`);for(const b of broken.slice(0,20))console.warn('  - '+b);}
     return count;
   }
   getWorld(runId:string): WorldSnapshot | null {

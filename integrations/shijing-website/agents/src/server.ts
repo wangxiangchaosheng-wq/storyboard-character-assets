@@ -20,7 +20,22 @@ import {evaluateForRun,commitUnlocks} from './achievement-runtime.js';
 import {MAX_SLOTS,listSlots,writeSlot,readSlotFile,clearSlot,nextFreeSlot,type CloudSaveEntry,type SlotWrite} from './save-slots.js';
 import type {WorldEvent,WorldSnapshot} from './world-contracts.js';
 import {createRequire} from 'node:module';
-export function view(store:Store,id:string){const run=store.run(id);const worlds=new WorldAgent(store);return{...run,strategy:projectStrategy(worlds.getWorld(id),worlds.recentEvents(id),{title:run.spec.title,runId:id,demo:worlds.basis(id)?.kind==='demo',basisNote:worlds.basis(id)?.note}),generationEnabled:process.env.AGENT_ALLOW_API_GENERATION!=='false',jobs:store.jobs(id).map(({input:_input,...j})=>j),history:store.history(id)};}
+/** 轮询瘦身：view() 里的 history 默认只带最近 HISTORY_LIMIT 条。
+ *
+ *  为什么要截断：GET /runs/{id} 每 2.5s 被地图页（PlayScreen）轮询一次，而 store.history(id)
+ *  是 `SELECT payload FROM events WHERE run_id=? ORDER BY rowid` 的 legacy 事件流水、**无 limit**：
+ *  接入引擎的对局每回合往 events 表写一行 {event,before,after}（实测单行约 0.7KB），随局长
+ *  无限膨胀。而 readers 只有一个——/discussion 的 showWorld 面板渲染事件摘要列表，看最近若干条
+ *  完全够用；PlayScreen 的 View 类型里声明了 history 却从未引用；成就判定与云存档另走本文件内
+ *  的 allEvents() 全量旁路，不经这里。events 表里的行一条不删，截断只发生在响应里。
+ *  （顺带说明：推演局 338KB 的大头是 strategy.changes，归投影层管；这里治的是 history 这条
+ *  没有上限的尾巴。）
+ *
+ *  按需全量：GET /runs/{id}?history=all 仍返回完整流水（顺序与原来一致，DESC 取尾再翻回时间序）。 */
+const HISTORY_LIMIT=50;
+function historySlice(store:Store,id:string,all:boolean){if(all)return store.history(id);
+ return store.db.prepare('SELECT payload FROM events WHERE run_id=? ORDER BY rowid DESC LIMIT ?').all(id,HISTORY_LIMIT).map(x=>JSON.parse(String(x.payload))).reverse();}
+export function view(store:Store,id:string,historyAll=false){const run=store.run(id);const worlds=new WorldAgent(store);return{...run,strategy:projectStrategy(worlds.getWorld(id),worlds.recentEvents(id),{title:run.spec.title,runId:id,demo:worlds.basis(id)?.kind==='demo',basisNote:worlds.basis(id)?.note}),generationEnabled:process.env.AGENT_ALLOW_API_GENERATION!=='false',jobs:store.jobs(id).map(({input:_input,...j})=>j),history:historySlice(store,id,historyAll)};}
 async function body(req:IncomingMessage){let size=0;const parts:Buffer[]=[];for await(const part of req){size+=part.length;assert(size<=200000,'请求内容过大',413);parts.push(part);}const raw=Buffer.concat(parts);
  // BUG-109：GBK 等非 UTF-8 字节此前被 toString() 照单全收，乱码文本入了库才在「世界
  // 引导」处爆 422，玩家照提示改名也治不好，还留下一堆乱码孤儿局。入库前先做 fatal 解码
@@ -200,7 +215,7 @@ export function makeServer(store:Store,worker:Worker){
         const id=path[1];store.run(id);
         // UX-007：删除议题。整局删除（连带世界/任务/事件），删完即不可恢复——前端有二次确认。
         if(method==='DELETE'&&path.length===2){store.deleteRun(id);out={ok:true};}
-        else if(method==='GET'&&path.length===2)out=view(store,id);
+        else if(method==='GET'&&path.length===2)out=view(store,id,url.searchParams.get('history')==='all');
         else if(method==='GET'&&path[2]==='strategy-map'&&path.length===3)out=worlds.strategyMap(id,url.searchParams.get('decisionId')||undefined);
         else if(method==='GET'&&path[2]==='world'&&path.length===3)out={world:worlds.getWorld(id),basis:worlds.basis(id)};
         else if(method==='POST'&&path[2]==='world'&&path.length===3){worlds.initializeWorld(id,await body(req));out=view(store,id);}
