@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import LocaleSwitch from './LocaleSwitch';
 import ScenarioPicker from './ScenarioPicker';
+import { useDialogFocus } from '../hooks/use-dialog-focus';
 import { SCENARIOS, toRunSpec, type ScenarioPreset } from '../../agents/src/scenarios';
 import { DIFFICULTIES } from '../../agents/src/onboarding';
 import { useLocale, translate as t } from '../lib/i18n';
@@ -51,6 +52,9 @@ export default function LauncherScreen() {
   const [panel, setPanel] = useState<'none' | 'new' | 'continue'>('none');
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState('');
+  // 续局浮层（role=dialog）的焦点管理：打开移焦进浮层、Esc 关闭、Tab 圈闭、
+  // 关闭后焦点还回「继续对局」按钮。清单 #B：此前四家 dialog 都只挂了 role 不管焦点。
+  const runsDialog = useDialogFocus<HTMLElement>({ open: panel === 'continue', onClose: () => setPanel('none') });
 
   useEffect(() => {
     let alive = true;
@@ -134,7 +138,7 @@ export default function LauncherScreen() {
         onCancel={() => setPanel('none')}
       />}
 
-      {panel === 'continue' && <section className="launcher-runs" role="dialog" aria-modal="true" aria-label={t(locale, 'launcher.continue')}>
+      {panel === 'continue' && <section ref={runsDialog} className="launcher-runs" role="dialog" aria-modal="true" aria-label={t(locale, 'launcher.continue')}>
         <div className="launcher-runs-card">
           <header className="launcher-runs-head">
             <h2>{t(locale, 'launcher.continue')}</h2>

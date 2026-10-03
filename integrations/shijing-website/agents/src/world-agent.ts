@@ -82,7 +82,8 @@ export class WorldAgent implements WorldStateService {
     store.db.exec(`CREATE TABLE IF NOT EXISTS world_states(run_id TEXT PRIMARY KEY,init_id TEXT NOT NULL,init_digest TEXT NOT NULL,basis TEXT NOT NULL,payload TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS world_events(run_id TEXT NOT NULL,event_id TEXT NOT NULL,revision INTEGER NOT NULL,digest TEXT NOT NULL,payload TEXT NOT NULL,PRIMARY KEY(run_id,event_id),UNIQUE(run_id,revision));
       CREATE TABLE IF NOT EXISTS world_demos(request_id TEXT PRIMARY KEY,run_id TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS world_strategy_snapshots(run_id TEXT NOT NULL,decision_id TEXT NOT NULL,revision INTEGER NOT NULL,payload TEXT NOT NULL,PRIMARY KEY(run_id,decision_id));`);
+      CREATE TABLE IF NOT EXISTS world_strategy_snapshots(run_id TEXT NOT NULL,decision_id TEXT NOT NULL,revision INTEGER NOT NULL,payload TEXT NOT NULL,PRIMARY KEY(run_id,decision_id));
+      CREATE TABLE IF NOT EXISTS bootstrap_markers(run_id TEXT PRIMARY KEY,revision INTEGER NOT NULL);`);
   }
   /** Called inside the caller's SQLite transaction, after the run row exists. */
   bootstrapRunInTransaction(run:Run):boolean {
@@ -187,17 +188,56 @@ export class WorldAgent implements WorldStateService {
       return{derived:derived.length,reason:'已按议题派生 '+derived.length+' 条国策'};
     });
   }
-  /** Startup migration only; GET never initializes or advances a world. */
+  /**
+   * 启动归档（只此一处）；GET 永远不初始化、不推进世界。
+   *
+   * 增量标记（bootstrap_markers）：archiveStrategies 是幂等的「补齐」——只给**没有快照的
+   * 结束决策**补一条，但每补一条都要把该局全部 world_events 读出来 JSON.parse。生产库 448
+   * 局里绝大多数局自上次开机根本没变过：局面没动就不会产生新决策，再扫一遍纯属白扫
+   * （实测未加标记前启动到 health 可用要 ~50 秒，日志全是「淘汰过期战略快照」）。
+   * 所以每局记一枚「上次成功归档到哪个 revision」的标记，与当前 revision 相同就跳过。
+   *
+   * 「相同 revision ⇒ 世界没变 ⇒ 没有可补的归档」这条不等式依赖的纪律：**每一次世界写入
+   * 都与它的 world_events 写入同事务地 bump world_states.revision**——applySettlement
+   * （reduceWorld 里 revision++）、applyLocalInTransaction、restoreRun（回滚补的审计行）、
+   * refreshDerivedAnchors 补报锚点，全部如此；world_strategy_snapshots 也只由
+   * archiveStrategies 写。所以 revision 相等 ⇒ 世界内容与事件流水与上次归档时逐字节相同
+   * ⇒ 再跑一遍 archiveStrategies 也只会 INSERT-if-missing 全部命中、一条不插。跳过的局
+   * **不会丢归档**，这不是「应该不会」，是由版本号纪律推出的恒等。
+   *
+   * ⚠️ 标记读不到（旧库第一次升级、表里没有这一行、甚至 SELECT 报错）一律按「没归档过」
+   * 全量归档——正确性优先于速度，绝不能因没标记就跳过一局。
+   *
+   * ⚠️ 标记在归档**之后**、且与归档写进**同一个事务**才落：归档抛异常（实测生产库有
+   * simulation profile 损坏的坏局，archiveStrategies 会在半途炸）时整个事务回滚，标记
+   * 不会留下。否则坏局下次开机就被跳过、归档缺失永远补不回来。坏局由下面的 broken[] 记账，
+   * 每次开机重试——修好存档或修好代码后的那次开机就能补上。
+   */
   bootstrapPendingRuns():number {
+    // 兜底建表：构造函数建过一次，这里再确保一次（IF NOT EXISTS，幂等）——表万一不齐
+    // （旧库第一次升级、外部动过库）也不能让启动崩在半路，宁可回到「全量归档」。
+    this.store.db.exec('CREATE TABLE IF NOT EXISTS bootstrap_markers(run_id TEXT PRIMARY KEY,revision INTEGER NOT NULL)');
     const rows=this.store.db.prepare('SELECT id FROM runs').all();let count=0;const broken:string[]=[];
+    const markerRow=this.store.db.prepare('SELECT revision FROM bootstrap_markers WHERE run_id=?');
+    const markerWrite=this.store.db.prepare('INSERT OR REPLACE INTO bootstrap_markers(run_id,revision) VALUES(?,?)');
     for(const row of rows){
       const id=String(row.id);
-      try{this.store.transaction(()=>{if(this.bootstrapRunInTransaction(this.store.run(id)))count++;const world=this.getWorld(id);if(world)this.archiveStrategies(world);});}
+      try{this.store.transaction(()=>{if(this.bootstrapRunInTransaction(this.store.run(id)))count++;const world=this.getWorld(id);if(!world)return;
+        let marked:number|undefined;
+        try{const m=markerRow.get(id);marked=m===undefined?undefined:Number(m.revision);}catch{marked=undefined;}
+        if(marked!==undefined&&marked===world.revision)return;
+        this.archiveStrategies(world);
+        markerWrite.run(id,world.revision);
+      });}
       // 坏局隔离：一个对局的存档损坏（实测生产库 439 局里 17 局的 simulation profile 是坏的）
-      // 不能让整个服务起不来。跳过它、记账、继续——其余局照常能玩。
+      // 不能让整个服务起不来。跳过它、记账、继续——其余局照常能玩。（上面的标记写在同一个
+      // 事务里，会随归档一起回滚——坏局永远没有标记，下次开机继续重试。）
       catch(e){broken.push(id+': '+(e instanceof Error?e.message:String(e)));}
     }
     if(broken.length){console.warn(`[bootstrap] ${broken.length} 个对局的存档损坏，已跳过（不影响其它对局）：`);for(const b of broken.slice(0,20))console.warn('  - '+b);}
+    // 跳过的局不走 archiveStrategies，也就不走它末尾的 pruneSnapshots——这里用一条聚合
+    // SELECT 兜住「快照超配却没被淘汰」的局，不恢复全量扫（见方法注释）。
+    this.pruneOverQuotaRuns();
     return count;
   }
   getWorld(runId:string): WorldSnapshot | null {
@@ -342,12 +382,45 @@ export class WorldAgent implements WorldStateService {
     if(dropped>0)console.log(`[snapshots] 本局淘汰过期战略快照 ${dropped} 条（保留最近 ${SNAPSHOT_KEEP_PER_RUN} 条 + 玩家战略）`);
   }
   /**
+   * 按需淘汰的兜底（廉价版）：**一条**聚合 SELECT 找出快照条数超过 SNAPSHOT_KEEP_PER_RUN
+   * 的局，只对这些局调 pruneSnapshots。别恢复成每局一次 SELECT 的全量扫——那正是上轮从
+   * 启动关键路径上挪走的几十秒开销。
+   *
+   * 为什么还需要它：打了增量标记的局被 bootstrap 跳过时不走 archiveStrategies，也就不会
+   * 顺带淘汰。这在**正常**情况下是可接受的——marker 是归档成功（archiveStrategies 末尾
+   * 必带 pruneSnapshots）之后才写下的，而 revision 相等意味着这个世界没再变过、不可能
+   * 产生新快照，跳过的局不存在「跳过即欠账」；每局写入时 mirror → archiveStrategies →
+   * pruneSnapshots 的按需淘汰也照旧。这里兜的是两件不正常的事：① 归档抛异常、永远拿不到
+   * 标记的坏局（坏了不产新快照，但历史存量可能超配）；② 今天之前从未淘汰过的老库欠账。
+   * 玩家亲手下的战略超配是特性不是欠账（永久保留），pruneSnapshots 对它们本来就不删。
+   */
+  private pruneOverQuotaRuns():number{
+    let over:{run_id:string;n:number}[];
+    try{over=this.store.db.prepare('SELECT run_id, COUNT(*) AS n FROM world_strategy_snapshots GROUP BY run_id HAVING COUNT(*)>?').all(SNAPSHOT_KEEP_PER_RUN) as {run_id:string;n:number}[];}
+    catch{return 0;}
+    if(!over.length)return 0;
+    console.log(`[snapshots] 按需淘汰：${over.length} 个对局快照超过 ${SNAPSHOT_KEEP_PER_RUN} 条，逐一检查`);
+    for(const row of over){
+      try{const w=this.getWorld(String(row.run_id));if(w)this.pruneSnapshots(w);}catch{/* 坏局读不出世界：跳过，等它被修好 */}
+    }
+    return over.length;
+  }
+  /**
    * 启动时兜底：库体积超过阈值才扫一遍淘汰。既有的大库（实测 7.13GB）不会因为「从今天起
    * 才淘汰」而继续膨胀——重启一次就把历史欠账清掉。小库不打这笔扫描，别为省几 MB 拖慢启动。
+   *
+   * 增量标记之后，「重启一次清欠账」大半由 bootstrapPendingRuns 接了：没有标记的局开机时
+   * 就全量归档+淘汰（bootstrap 末尾的 pruneOverQuotaRuns 再聚合兜一遍超配的局）。所以这里
+   * 不再无条件全量扫——**标记表为空（旧库第一次升级）或标记覆盖率过低（大面积没标记，
+   * 说明 bootstrap 没在正常打标记）时才扫**；覆盖率高的库里，未变的局在打标记那轮已淘汰、
+   * 变过的局本轮 bootstrap 刚淘汰，再对 448 局各发一次 SELECT 纯属重复劳动。
    */
   sweepSnapshots(){
     let size=0;try{size=statSync(resolve(this.store.directory,'agents.sqlite')).size;}catch{return 0;}
     if(size<SNAPSHOT_SWEEP_MIN_BYTES)return 0;
+    const worlds=Number((this.store.db.prepare('SELECT COUNT(*) AS n FROM world_states').get() as {n:number}).n);
+    const markers=Number((this.store.db.prepare('SELECT COUNT(*) AS n FROM bootstrap_markers').get() as {n:number}).n);
+    if(worlds>0&&markers>=worlds*0.9){console.log(`[snapshots] 启动跳过全量淘汰：${markers}/${worlds} 局已带归档标记，未变的上轮已淘汰、变过的本轮已淘汰`);return 0;}
     const runs=this.store.db.prepare('SELECT DISTINCT run_id FROM world_strategy_snapshots').all() as {run_id:string}[];
     let before=0,after=0;
     const count=()=>Number((this.store.db.prepare('SELECT COUNT(*) AS n FROM world_strategy_snapshots').get() as {n:number}).n);

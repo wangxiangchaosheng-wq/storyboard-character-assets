@@ -3,6 +3,7 @@ import {useState} from 'react';
 import {recommendDifficulty,type Difficulty} from '../../agents/src/onboarding';
 import {scenarioTitle,scenarioPremise,scenarioHasSimulation,effectiveYears,type ScenarioPreset} from '../../agents/src/scenarios';
 import {useLocale,translate as t,translateEnum} from '../lib/i18n';
+import {useDialogFocus} from '../hooks/use-dialog-focus';
 
 /**
  * 选局面板 v1：左侧剧本、右侧难度，底部开局。
@@ -22,8 +23,10 @@ export default function ScenarioPicker({scenarios,difficulties,onStart,onCancel}
  const [saved]=useState(()=>{try{return Object.keys(localStorage).some(k=>k.startsWith('shijing-agent-run')||k.startsWith('shijing-research-run')||k==='shijing-onboard-v1');}catch{return false;}});
  const [scenarioId,setScenarioId]=useState(scenarios[0]?.id||'');
  const [difficultyId,setDifficultyId]=useState(()=>recommendDifficulty(saved).id);
+ // 清单 #B：选局面板是模态浮层，焦点归 useDialogFocus 管（Esc=取消、Tab 圈闭、关闭还焦）
+ const dialog=useDialogFocus<HTMLElement>({onClose:onCancel});
  const start=()=>{try{localStorage.setItem('shijing-difficulty-v1',difficultyId);}catch{/* 存储不可用只影响下次默认值，不挡开局 */}onStart(scenarioId,difficultyId);};
- return <section className="scenario-picker" role="dialog" aria-modal="true" aria-label={t(locale,'scenario.title')}>
+ return <section ref={dialog} className="scenario-picker" role="dialog" aria-modal="true" aria-label={t(locale,'scenario.title')}>
   <header className="scenario-picker-header"><h2>{t(locale,'scenario.title')}</h2><p>{t(locale,'scenario.subtitle')}</p><button type="button" onClick={onCancel} aria-label={t(locale,'scenario.close')}>×</button></header>
   <div className="scenario-picker-body">
    <ul className="scenario-picker-list" aria-label={t(locale,'scenario.list')}>{scenarios.map(s=><li key={s.id}>

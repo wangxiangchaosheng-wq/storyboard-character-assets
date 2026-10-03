@@ -55,6 +55,12 @@ function detectLocale(): 'zh-CN' | 'en' {
   try { const v = localStorage.getItem('shijing-locale'); if (v === 'en' || v === 'zh-CN') return v; } catch { /* 隐私模式 */ }
   return navigator.language?.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
 }
+/** 目标 run 是否存在（跨局读档前的存在性校验，清单 #C）。与 /discussion 的
+ *  AgentDiscussion.runExists 同一口径：GET /runs/{id}，404 即「不在这台机器上」——
+ *  换机器留下的存档直接跳过去会落到 500 页，先把关再跳。 */
+async function runExists(id: string): Promise<boolean> {
+  try { await api<unknown>('runs/' + id); return true; } catch { return false; }
+}
 
 /** 侧栏图标轨的域。键即 i18n 前缀 play.dock.<key>。 */
 const PANELS = ['power', 'politics', 'fiscal', 'focus', 'tech', 'province', 'diplomacy', 'fog', 'stratagem', 'chronicle', 'court', 'saves'] as const;
@@ -259,6 +265,10 @@ export default function PlayScreen() {
     try {
       const r = await api<{ entry: { gameId: string; title: string } }>('saves/load', { slot });
       if (r.entry.gameId === view.id) { const res = await api<{ run: View }>('saves/load', { slot, restore: true, runId: view.id }); setView(res.run); setNote(t(locale, 'save.loaded', { day: Math.floor(res.run.strategy?.worldTime.elapsedDays ?? 0) + 1 })); }
+      // 跨局读档（清单 #C）：先确认目标 run 真的在这台机器上再跳。曾是直接 location.href，
+      // 换机器留下的槽位会把玩家扔到一个 500 页；与 /discussion 的 loadFromSlot 同口径
+      // 报 save.notOnMachine（提示落在存档面板里，玩家知道是哪一格出了问题）。
+      else if (!(await runExists(r.entry.gameId))) setSaveNote(t(locale, 'save.notOnMachine', { title: r.entry.title }));
       else location.href = '/play?run=' + encodeURIComponent(r.entry.gameId);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
@@ -306,7 +316,7 @@ export default function PlayScreen() {
         <p className="play-pane-note">{t(locale, 'play.courtHint')}</p>
         <a className="play-court-link" href={'/discussion?run=' + encodeURIComponent(view.id)}>{t(locale, 'play.courtOpen')}</a>
       </section>;
-      case 'saves': return <SaveSlotsPanel tab={saveTab} onTab={setSaveTab} slots={slots} achv={achv} busy={busy} note={saveNote} onSaveSlot={x => void saveToSlot(x)} onLoadSlot={x => void loadFromSlot(x)} onClearSlot={x => void clearSlot(x)} onRefresh={() => void refreshAchv()} onClose={() => setPanel(null)} />;
+      case 'saves': return <SaveSlotsPanel modal={false} tab={saveTab} onTab={setSaveTab} slots={slots} achv={achv} busy={busy} note={saveNote} onSaveSlot={x => void saveToSlot(x)} onLoadSlot={x => void loadFromSlot(x)} onClearSlot={x => void clearSlot(x)} onRefresh={() => void refreshAchv()} onClose={() => setPanel(null)} />;
       default: return null;
     }
   }, [view, panel, s, busy, locale, next, slots, achv, saveNote, saveTab, rawWorld]);

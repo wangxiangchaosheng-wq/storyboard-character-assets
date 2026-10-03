@@ -7,6 +7,7 @@ import WhatIfCard from './WhatIfCard';
 import {useCallback,useEffect,useRef,useState,type ReactNode} from 'react';
 import {linkedObjects,type StrategyData} from '../lib/strategy';
 import {useLocale,translate as t} from '../lib/i18n';
+import {DIALOG_FOCUSABLE_SELECTOR} from '../hooks/use-dialog-focus';
 function arrowShape(from:{x:number;y:number},to:{x:number;y:number}){
  const dx=to.x-from.x,dy=to.y-from.y,d=Math.hypot(dx,dy)||1,ux=dx/d,uy=dy/d;
  const a={x:from.x+ux*22,y:from.y+uy*22},b={x:to.x-ux*26,y:to.y-uy*26};
@@ -110,7 +111,7 @@ function MarkerStrategyScreen({data,onClose,toolbar,artwork="/strategy/map-world
  const popupTop=Math.max(3,Math.min(48,(anchor.y-40)/863*100-5));
  const history=data.changes.filter(c=>selected&&((army||city)&&data.ready?c.entityId===selected:(c.objects.includes(selected)||c.decisionId===(action?.decisionId||selected))));
  const pending=data.pendingDecision;
-   return <div className={inline?"strategy-overlay strategy-inline":toolbar?"strategy-overlay strategy-gallery-overlay":"strategy-overlay"} role={inline?undefined:"dialog"} aria-modal={inline?undefined:"true"} aria-label={t(locale,'strategy.aria')} onKeyDown={e=>{if(e.key!=='Tab'||inline)return;const nodes=Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),[tabindex="0"]'));const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}}>{inline?null:toolbar?toolbar(()=>setClosing(true)):<button className="strategy-close-original" onClick={()=>setClosing(true)} aria-label={t(locale,'strategy.close')}>×</button>}<div className="strategy-scroll">{/* paper 的 clip-path 只在展开动画进行中挂；**静止态必须摘掉**——本机渲染器里
+   return <div className={inline?"strategy-overlay strategy-inline":toolbar?"strategy-overlay strategy-gallery-overlay":"strategy-overlay"} role={inline?undefined:"dialog"} aria-modal={inline?undefined:"true"} aria-label={t(locale,'strategy.aria')} onKeyDown={e=>{if(e.key!=='Tab'||inline)return;const nodes=Array.from(e.currentTarget.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE_SELECTOR));const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}}>{inline?null:toolbar?toolbar(()=>setClosing(true)):<button className="strategy-close-original" onClick={()=>setClosing(true)} aria-label={t(locale,'strategy.close')}>×</button>}<div className="strategy-scroll">{/* paper 的 clip-path 只在展开动画进行中挂；**静止态必须摘掉**——本机渲染器里
     带着 clip-path 的 <img> 只画中间一条窄带（整幅地图「缩成一条线」，实测去掉即恢复），
     而地图主页这一态是常驻的，绝不能让底图带病上场。 */}
 {/* paper 的 clip-path 只在展开动画进行中挂；静止态摘掉（带着 clip-path 的首绘在这个

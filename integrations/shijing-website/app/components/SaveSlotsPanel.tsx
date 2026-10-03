@@ -1,11 +1,19 @@
 'use client';
 import {ACHIEVEMENTS,type AchievementProgress} from '../../steam/achievements';
 import {useLocale,translate as t,translateEnum} from '../lib/i18n';
+import {useDialogFocus} from '../hooks/use-dialog-focus';
 
 /**
  * 存档与成就面板 v1：八个存档槽 + 成就一览，共用「这一局进行到哪儿了」的上下文。
  * 为什么并成一个面板：两者看的是同一局（标题、天数、朝政），分成两个界面玩家要在同一条
  * 动线上来回切；数据全部由 AgentDiscussion 持有（跳转/下令之后照样刷新），本组件只呈现与回调。
+ *
+ * 两种宿主（清单 #B/D）：
+ * - modal=true（默认，/discussion 的整页浮层）：aria-modal="true" + 锁 body 滚动 +
+ *   Tab 圈闭 + Esc 关闭 + 关闭还焦，焦点全归 useDialogFocus 管；
+ * - modal=false（/play 侧栏抽屉复用）：是非阻塞抽屉，去掉 aria-modal（否则读屏软件
+ *   会骗玩家说「背景不可交互」，而地图其实点得动）、不锁 body 滚动、不圈 Tab
+ *   （抽屉自带的 × 关闭钮在面板之前，圈死了键盘就到不了它）；焦点移入/还焦与 Esc 仍在。
  *
  * 壳层双语（app/lib/i18n.ts 的 save.* 键）：按钮、页签、表头、aria-label、提示语全部走表；
  * 成就 name/description 与 slot.title 属内容层，留中文原值；朝政三态与成就档位
@@ -14,13 +22,16 @@ import {useLocale,translate as t,translateEnum} from '../lib/i18n';
 export interface SaveSlotView{slot:number;gameId:string;title:string;savedAt:string;revision:number;elapsedDays:number;court:string;auto:boolean}
 export interface AchievementsView{progress:AchievementProgress[];summary:string[];steamAvailable:boolean}
 const savedAtText=(v:string)=>{try{return new Date(v).toLocaleString('zh-CN',{hour12:false});}catch{return v;}};
-export default function SaveSlotsPanel({tab,onTab,slots,achv,busy,note,onSaveSlot,onLoadSlot,onClearSlot,onRefresh,onClose}:{
+export default function SaveSlotsPanel({tab,onTab,slots,achv,busy,note,onSaveSlot,onLoadSlot,onClearSlot,onRefresh,onClose,modal=true}:{
  tab:'saves'|'achv';onTab:(t:'saves'|'achv')=>void;slots:SaveSlotView[];achv:AchievementsView|null;busy:boolean;note:string;
  onSaveSlot:(slot:number)=>void;onLoadSlot:(slot:number)=>void;onClearSlot:(slot:number)=>void;onRefresh:()=>void;onClose:()=>void;
+ /** true=模态浮层（锁滚动/Tab 圈闭/aria-modal）；false=抽屉内非阻塞复用。/play 抽屉传 false。 */
+ modal?:boolean;
 }){
  const [locale]=useLocale();
  const unlocked=achv?achv.progress.filter(p=>p.unlocked).length:0;
- return <aside className="saves-panel" role="dialog" aria-modal="true" aria-label={t(locale,'save.panelAria')}>
+ const dialog=useDialogFocus<HTMLElement>({onClose:onClose,modal});
+ return <aside ref={dialog} className="saves-panel" role="dialog" aria-modal={modal?true:undefined} aria-label={t(locale,'save.panelAria')}>
   <header><h2>{t(locale,'save.panelTitle')}</h2><span className="saves-count">{t(locale,'save.unlockedCount',{n:unlocked,total:ACHIEVEMENTS.length})}</span><button className="saves-close" onClick={onClose} aria-label={t(locale,'save.closeAria')}>×</button></header>
   <nav className="saves-tabs" aria-label={t(locale,'save.tabsAria')}>
    <button className={tab==='saves'?'saves-tab active':'saves-tab'} aria-pressed={tab==='saves'} onClick={()=>onTab('saves')}>{t(locale,'save.tabSaves')}</button>

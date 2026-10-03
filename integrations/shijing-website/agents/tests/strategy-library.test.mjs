@@ -44,3 +44,80 @@ test('startup reconstructs legacy ended snapshots before later ownership changes
 test('HTTP library and topic map are read-only and never generate art',async t=>{const {store,agent,id}=setup(t);const server=makeServer(store,{active:false,drain(){assert.fail('read must not generate');}});await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>{server.close(r);server.closeAllConnections();}));const base='http://127.0.0.1:'+server.address().port;const index=await(await fetch(base+'/strategy-library')).json();assert.equal(index.maps[0].id,id);const map=await(await fetch(base+'/runs/'+id+'/strategy-map')).json();assert.equal(map.topicId,id);assert.equal(agent.getWorld(id).revision,1,'只读不得改写世界（开局清算那一次除外）');assert.equal((await fetch(base+'/runs/'+id+'/strategy-map?decisionId=missing')).status,404);});
 test('uninitialized topics have their own units without inventing map data',t=>{const {store,agent}=setup(t);const run=store.create({...spec,title:'其他时代议题',scenario:{background:'公元1000年春'}});const unit=agent.strategyLibrary().maps.find(r=>r.id===run.id);assert.equal(unit.status,'uninitialized');assert.equal(unit.year,1000);assert.equal(unit.strategies.length,0);assert.throws(()=>agent.strategyMap(run.id),/尚未提供/);});
 test('pagination remains stable when a previously unseen topic changes between pages',t=>{const {store,agent}=setup(t);for(let i=0;i<4;i++)store.create(spec);const page=agent.strategyLibrary('',2);const remaining=agent.strategyLibrary(page.nextCursor,2);const id=remaining.maps[0].id;if(agent.getWorld(id).pendingDecision)agent.decide(id,{commandId:'settle-'+id,expectedRevision:agent.getWorld(id).revision,choiceId:'decline'});order(agent,id,'concurrent','march',{targetCityId:'changan'});const after=agent.strategyLibrary(page.nextCursor,2);assert.deepEqual(after.maps.map(r=>r.id),remaining.maps.map(r=>r.id));});
+// H（启动性能）：bootstrapPendingRuns 原来每次启动都全量遍历所有局、把每局 world_events 全读
+// 出来 JSON.parse 归档——448 局的库里启动到 health 可用要 ~50 秒（日志全是「淘汰过期战略
+// 快照」）。现在每局记一枚 bootstrap_markers（上次成功归档到的 revision），没变过的局直接
+// 跳过。三条回归锁死：① 不变的世界第二次 bootstrap 不再触发归档（变了才补）；② 旧库
+// （标记表缺失/无标记行）仍然全量归档；③ 归档抛异常的局不写标记、修好后下次开机补得上。
+const endedSetup=(t)=>{const {store,agent,id}=setup(t);// 造一条已结束且已归档的决策：补给令走完即 completed，归档随 mirror 当时落库
+ agent.localAdvance(id,{commandId:'warmup',expectedRevision:agent.getWorld(id).revision,hours:8});
+ agent.localOrder(id,{commandId:'load',expectedRevision:agent.getWorld(id).revision,armyId:'army-wei-yan',kind:'resupply',sourceCityId:'hanzhong',foodKg:2000});
+ const ended=Object.values(agent.getWorld(id).decisions).find(d=>d.issuerId!=='local-defender'&&['completed','failed','cancelled'].includes(d.status));assert.ok(ended,'推进后应有一条结束的决策，否则归档无事可做、测不到跳过');
+ return{store,agent,id,endedId:ended.id};};
+const spyArchive=(agent)=>{let calls=0;const orig=agent.archiveStrategies.bind(agent);agent.archiveStrategies=(w)=>{calls++;return orig(w);};return()=>calls;};
+const snapCount=(store,id)=>store.db.prepare('SELECT COUNT(*) AS n FROM world_strategy_snapshots WHERE run_id=?').get(id).n;
+const markerOf=(store,id)=>store.db.prepare('SELECT revision FROM bootstrap_markers WHERE run_id=?').get(id);
+test('unchanged world is skipped by the incremental archive marker; changed worlds are re-archived',t=>{
+ const {store,agent,id}=endedSetup(t);
+ const before=snapCount(store,id);assert.ok(before>0,'结束决策应已有快照（写入时按需归档）');
+ agent.bootstrapPendingRuns();
+ const rev=agent.getWorld(id).revision;
+ assert.equal(markerOf(store,id)?.revision,rev,'首次 bootstrap 必须把标记写成当前 revision');
+ const calls=spyArchive(agent);
+ agent.bootstrapPendingRuns();
+ assert.equal(calls(),0,'revision 没变的世界再 bootstrap 不得触发归档');
+ assert.equal(snapCount(store,id),before,'跳过时不得改动快照表');
+ assert.equal(markerOf(store,id)?.revision,rev,'跳过时不得改写标记');
+ // 反方向：世界一变，标记就过期，归档照跑、标记照更新——增量标记不能把「真的变了」也漏掉
+ agent.localAdvance(id,{commandId:'move',expectedRevision:agent.getWorld(id).revision,hours:2});
+ const after=agent.getWorld(id).revision;assert.ok(after>rev);
+ const base=calls();// 注意：localAdvance 自己就走 mirror→archiveStrategies 按需归档过一次，计数只认 bootstrap 这一趟的增量
+ agent.bootstrapPendingRuns();
+ assert.equal(calls(),base+1,'推进过的世界再 bootstrap 必须重新归档');
+ assert.equal(markerOf(store,id)?.revision,after,'归档成功后标记必须更新到新 revision');
+ assert.equal(snapCount(store,id),before,'重归档是幂等补齐，不该多出快照');
+});
+test('legacy library without marker rows still fully archives on first upgraded boot',t=>{
+ const {store,agent,id,endedId}=endedSetup(t);
+ const payload=String(store.db.prepare('SELECT payload FROM world_strategy_snapshots WHERE run_id=? AND decision_id=?').get(id,endedId).payload);
+ // 旧库模拟一：标记表整张不存在（这一次升级之前的库）
+ store.db.exec('DROP TABLE bootstrap_markers');
+ store.db.prepare('DELETE FROM world_strategy_snapshots WHERE run_id=?').run(id);
+ agent.bootstrapPendingRuns();
+ const again=store.db.prepare('SELECT payload FROM world_strategy_snapshots WHERE run_id=? AND decision_id=?').get(id,endedId);
+ assert.deepEqual(JSON.parse(String(again?.payload)),JSON.parse(payload),'旧库没有标记表也必须把缺失的归档补齐，内容一帧不许差');
+ assert.equal(markerOf(store,id)?.revision,agent.getWorld(id).revision,'补齐后照样打标记');
+ // 旧库模拟二：表在但这一局没有标记行（升级中途、标记被清）
+ store.db.prepare('DELETE FROM bootstrap_markers WHERE run_id=?').run(id);
+ store.db.prepare('DELETE FROM world_strategy_snapshots WHERE run_id=?').run(id);
+ agent.bootstrapPendingRuns();
+ const third=store.db.prepare('SELECT payload FROM world_strategy_snapshots WHERE run_id=? AND decision_id=?').get(id,endedId);
+ assert.deepEqual(JSON.parse(String(third?.payload)),JSON.parse(payload),'没有标记行一律按从没归档过处理，绝不能因「读不到」就跳过');
+});
+test('a run whose archive throws gets no marker and is retried on the next boot',t=>{
+ const {store,agent,id,endedId}=endedSetup(t);
+ store.db.prepare('DELETE FROM world_strategy_snapshots WHERE run_id=?').run(id);
+ store.db.exec("CREATE TRIGGER fail_archive BEFORE INSERT ON world_strategy_snapshots BEGIN SELECT RAISE(ABORT,'test archive failure'); END;");
+ const rev=agent.getWorld(id).revision;
+ agent.bootstrapPendingRuns();
+ assert.ok(!markerOf(store,id),'归档被回滚的局绝不能留下标记——否则它下次就被跳过、归档缺失永远补不上');
+ assert.equal(agent.getWorld(id).revision,rev,'失败的 bootstrap 不许改动世界');
+ assert.equal(snapCount(store,id),0,'归档失败时快照表必须原样（事务回滚）');
+ store.db.exec('DROP TRIGGER fail_archive');
+ agent.bootstrapPendingRuns();
+ assert.equal(markerOf(store,id)?.revision,rev,'存档修好后下次开机补打标记');
+ assert.ok(store.db.prepare('SELECT 1 FROM world_strategy_snapshots WHERE run_id=? AND decision_id=?').get(id,endedId),'修好后归档必须真的补上');
+});
+test('skipped runs still get over-quota AI snapshots pruned by the cheap aggregate',t=>{
+ const {store,agent,id}=endedSetup(t);
+ agent.bootstrapPendingRuns();// 先打上标记：此后再 bootstrap 必走跳过路径
+ const calls=spyArchive(agent);
+ const playerSnap=store.db.prepare('SELECT decision_id FROM world_strategy_snapshots WHERE run_id=?').all(id)[0].decision_id;
+ for(let i=0;i<210;i++)store.db.prepare('INSERT OR REPLACE INTO world_strategy_snapshots VALUES(?,?,?,?)').run(id,'ai-'+i,i+50,JSON.stringify({ai:i}));
+ assert.equal(snapCount(store,id),211);
+ agent.bootstrapPendingRuns();
+ assert.equal(calls(),0,'标记未过期，归档不得触发');
+ const rows=store.db.prepare('SELECT decision_id AS id FROM world_strategy_snapshots WHERE run_id=?').all(id).map(r=>r.id);
+ assert.ok(rows.includes(playerSnap),'玩家的战略不被这条兜底误伤');
+ assert.equal(rows.length,201,'被跳过的局超配的例行快照仍要被廉价聚合淘汰（210+1 → 201）');
+});

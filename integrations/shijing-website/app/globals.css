@@ -419,7 +419,13 @@ button:disabled{cursor:default}
 .strategy-overlay{background:#00000094}
 .strategy-icon-light{opacity:0;pointer-events:none;filter:brightness(1.16)drop-shadow(0 0 4px #ffe3a3)drop-shadow(0 0 8px #e3b257);transition:opacity .18s}
 :is(.strategy-objects g:hover>.strategy-icon-light,.strategy-objects g:focus-visible>.strategy-icon-light,.strategy-objects g.lit>.strategy-icon-light){opacity:1}
-.strategy-objects .lit,.strategy-objects g:focus{filter:none}
+/* 这条曾被写成 `.strategy-objects .lit,.strategy-objects g:focus{filter:none}`——同特异度且更靠后，
+   把 178 行的金色高亮（.lit）与 179 行的焦点环双双抹掉：鼠标点选与键盘聚焦在地图上
+   都看不出来了。现在只保留 :focus 去掉 outline（SVG <g> 不支持 outline，焦点环改画在
+   子 rect 的描边上），并让 .lit 与 g:focus 各自恢复自己的 filter。 */
+.strategy-objects g:focus{outline:none}
+.strategy-objects g:focus-visible>rect{stroke:#ffc43c;stroke-width:3;filter:drop-shadow(0 0 6px #ffb521)}
+.strategy-objects g:focus-visible>circle{stroke:#ffc43c;stroke-width:3}
 :is(.strategy-objects g[aria-label^=行动]:hover polyline:nth-child(2),.strategy-objects g[aria-label^=行动]:focus-visible polyline:nth-child(2)){stroke:#e8c480;filter:drop-shadow(0 0 5px #ffce69)}
 :is(.strategy-objects g:hover>.strategy-action-arrow,.strategy-objects g:focus-visible>.strategy-action-arrow,.strategy-objects g.lit>.strategy-action-arrow){filter:brightness(1.15)drop-shadow(0 0 5px #efc167)}
 .strategy-details{z-index:4;width:27%;max-height:48%}

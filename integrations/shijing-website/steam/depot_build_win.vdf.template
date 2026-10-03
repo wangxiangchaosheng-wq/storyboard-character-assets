@@ -1,0 +1,21 @@
+"DepotBuild"
+{
+	"DepotID" "__DEPOT_ID__"
+	"ContentRoot" "__CONTENT_ROOT__"
+	"FileMapping"
+	{
+		// 把 depot 内容根下的整棵树原样映射到 depot 根。Desktop 版就是 win-unpacked 目录本身，
+		// 玩家安装后 exe 就在安装目录顶层——Steamworks 后台的「启动选项」按 exe 名填。
+		"LocalPath" "*"
+		"DepotPath" "."
+		"recursive" "1"
+	}
+	// 不随 depot 分发的东西。符号表与 source map 是构建残渣，一两个 MB 也要不了命但没人要；
+	// steam_appid.txt 是开发期约定，玩家从 Steam 客户端启动时由客户端自己写在 exe 旁边，
+	// 打进 depot 只会让「用占位 appid 打包」的构建把错的 id 留给玩家。
+	"FileExclusion" "*.pdb"
+	"FileExclusion" "*.map"
+	"FileExclusion" "steam_appid.txt"
+	"FileExclusion" ".git*"
+	"FileExclusion" "*.log"
+}

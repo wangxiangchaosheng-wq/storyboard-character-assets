@@ -1,0 +1,302 @@
+[
+  {
+    "name": "first_run_complete",
+    "displayName": {
+      "zh-cn": "完成一局"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "城池归一，打完第一局推演"
+    },
+    "icon": "icons/first_run_complete.png",
+    "icongray": "icons/first_run_complete-gray.png"
+  },
+  {
+    "name": "campaign_victory",
+    "displayName": {
+      "zh-cn": "北伐功成"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "城池过半，北伐之势已成"
+    },
+    "icon": "icons/campaign_victory.png",
+    "icongray": "icons/campaign_victory-gray.png"
+  },
+  {
+    "name": "first_year_jump",
+    "displayName": {
+      "zh-cn": "一年之跳"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "第一次一次性跳转满一年"
+    },
+    "icon": "icons/first_year_jump.png",
+    "icongray": "icons/first_year_jump-gray.png"
+  },
+  {
+    "name": "first_edict",
+    "displayName": {
+      "zh-cn": "初次请旨"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "第一次亲自拍板一项决策"
+    },
+    "icon": "icons/first_edict.png",
+    "icongray": "icons/first_edict-gray.png"
+  },
+  {
+    "name": "capture_first_city",
+    "displayName": {
+      "zh-cn": "攻克一城"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "第一次从敌手手中夺下一座城"
+    },
+    "icon": "icons/capture_first_city.png",
+    "icongray": "icons/capture_first_city-gray.png"
+  },
+  {
+    "name": "cut_enemy_supply",
+    "displayName": {
+      "zh-cn": "断敌粮道"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "把一支敌军的粮草削到断粮线以下"
+    },
+    "icon": "icons/cut_enemy_supply.png",
+    "icongray": "icons/cut_enemy_supply-gray.png"
+  },
+  {
+    "name": "outnumbered_victory",
+    "displayName": {
+      "zh-cn": "以少胜多"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "以更少的兵力歼灭一支敌军"
+    },
+    "icon": "icons/outnumbered_victory.png",
+    "icongray": "icons/outnumbered_victory-gray.png"
+  },
+  {
+    "name": "bloodless_capture",
+    "displayName": {
+      "zh-cn": "不损一兵"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "一兵不损地夺下一座城"
+    },
+    "icon": "icons/bloodless_capture.png",
+    "icongray": "icons/bloodless_capture-gray.png"
+  },
+  {
+    "name": "annihilate_army",
+    "displayName": {
+      "zh-cn": "覆没一军"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "成建制歼灭一支敌军"
+    },
+    "icon": "icons/annihilate_army.png",
+    "icongray": "icons/annihilate_army-gray.png"
+  },
+  {
+    "name": "treasury_10k",
+    "displayName": {
+      "zh-cn": "国库过万"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "国库积钱超过一万"
+    },
+    "icon": "icons/treasury_10k.png",
+    "icongray": "icons/treasury_10k-gray.png"
+  },
+  {
+    "name": "province_surplus",
+    "displayName": {
+      "zh-cn": "一省结余"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "一省治所积粮达到结余线"
+    },
+    "icon": "icons/province_surplus.png",
+    "icongray": "icons/province_surplus-gray.png"
+  },
+  {
+    "name": "tuntian_effective",
+    "displayName": {
+      "zh-cn": "屯田见效"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "屯田之省治所积粮达到见效线"
+    },
+    "icon": "icons/tuntian_effective.png",
+    "icongray": "icons/tuntian_effective-gray.png"
+  },
+  {
+    "name": "all_factions_loyal",
+    "displayName": {
+      "zh-cn": "六派归心"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "六派忠诚全部达到满格线"
+    },
+    "icon": "icons/all_factions_loyal.png",
+    "icongray": "icons/all_factions_loyal-gray.png"
+  },
+  {
+    "name": "no_one_angry",
+    "displayName": {
+      "zh-cn": "无人愤怒"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "六派无一派的认可跌到愤怒线"
+    },
+    "icon": "icons/no_one_angry.png",
+    "icongray": "icons/no_one_angry-gray.png"
+  },
+  {
+    "name": "eunuch_dominance",
+    "displayName": {
+      "zh-cn": "宦官坐大"
+    },
+    "hidden": true,
+    "description": {
+      "zh-cn": "宦官势力膨胀到失衡——做坏了也算成就"
+    },
+    "icon": "icons/eunuch_dominance.png",
+    "icongray": "icons/eunuch_dominance-gray.png"
+  },
+  {
+    "name": "alliance_formed",
+    "displayName": {
+      "zh-cn": "缔结同盟"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "与任一势力结成同盟"
+    },
+    "icon": "icons/alliance_formed.png",
+    "icongray": "icons/alliance_formed-gray.png"
+  },
+  {
+    "name": "treaty_breached",
+    "displayName": {
+      "zh-cn": "撕毁条约"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "背弃一条已签的条约——霸名也是名"
+    },
+    "icon": "icons/treaty_breached.png",
+    "icongray": "icons/treaty_breached-gray.png"
+  },
+  {
+    "name": "hegemony_100",
+    "displayName": {
+      "zh-cn": "霸名满百"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "霸名积到顶格"
+    },
+    "icon": "icons/hegemony_100.png",
+    "icongray": "icons/hegemony_100-gray.png"
+  },
+  {
+    "name": "fire_attack",
+    "displayName": {
+      "zh-cn": "火攻得手"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "火攻之计当真烧到了敌军"
+    },
+    "icon": "icons/fire_attack.png",
+    "icongray": "icons/fire_attack-gray.png"
+  },
+  {
+    "name": "empty_fort",
+    "displayName": {
+      "zh-cn": "空城退敌"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "空城计成，敌军疑而不进，一兵未损"
+    },
+    "icon": "icons/empty_fort.png",
+    "icongray": "icons/empty_fort-gray.png"
+  },
+  {
+    "name": "sow_discord",
+    "displayName": {
+      "zh-cn": "离间成功"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "离间之计当真乱了敌军"
+    },
+    "icon": "icons/sow_discord.png",
+    "icongray": "icons/sow_discord-gray.png"
+  },
+  {
+    "name": "harem_year",
+    "displayName": {
+      "zh-cn": "后宫之年"
+    },
+    "hidden": true,
+    "description": {
+      "zh-cn": "后宫游猎满一年而国未亡"
+    },
+    "icon": "icons/harem_year.png",
+    "icongray": "icons/harem_year-gray.png"
+  },
+  {
+    "name": "historian_100",
+    "displayName": {
+      "zh-cn": "国史盈室"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "一局的事件流水记满一百条"
+    },
+    "icon": "icons/historian_100.png",
+    "icongray": "icons/historian_100-gray.png"
+  },
+  {
+    "name": "thirty_years",
+    "displayName": {
+      "zh-cn": "三十之年"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "一局推演推进三十年"
+    },
+    "icon": "icons/thirty_years.png",
+    "icongray": "icons/thirty_years-gray.png"
+  },
+  {
+    "name": "veteran_five_runs",
+    "displayName": {
+      "zh-cn": "五局老将"
+    },
+    "hidden": false,
+    "description": {
+      "zh-cn": "累计完成五局推演"
+    },
+    "icon": "icons/veteran_five_runs.png",
+    "icongray": "icons/veteran_five_runs-gray.png"
+  }
+]

@@ -1,0 +1,14 @@
+"AppBuild"
+{
+	// appid 由 depot-upload.mjs 从环境变量 STEAM_APP_ID 注入；仓库里不写死任何数字，
+	// 否则克隆到别人机器上就会朝别人的 app 上传。
+	"AppID" "__APP_ID__"
+	"Desc" "__DESC__"
+	"ContentRoot" "__CONTENT_ROOT__"
+	"BuildOutput" "__BUILD_OUTPUT__"
+__SET_LIVE__
+	"Depots"
+	{
+__DEPOT_LINES__
+	}
+}
