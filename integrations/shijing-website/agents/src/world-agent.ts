@@ -23,6 +23,8 @@ import {applyDecisionEffect} from './decisions.js';
 import {round,clamp} from './simulation-types.js';
 import {anchorLine,ANCHOR_HISTORIAN_NOTE} from './anchors.js';
 import {leisurePassage,counselReply} from './court.js';
+import {resolve} from 'node:path';
+import {statSync} from 'node:fs';
 
 /**
  * 探针：这个世界现在还能不能往前推？
@@ -58,6 +60,21 @@ function canonical(value: unknown): string {
 /** UX-010：军令类型 → 玩家口径的中文动词。英文枚举只活在代码与 trace 里，不进叙事。 */
 const ORDER_KIND_CN:Record<OrderKind,string>={march:'行军','forced-march':'急行军',garrison:'驻守',resupply:'补给',attack:'进攻',besiege:'围困',retreat:'撤退',explore:'探索'};
 const digest=(value:unknown)=>createHash('sha256').update(canonical(value)).digest('hex');
+
+/**
+ * 单局战略快照的保留条数（AI/例行代决部分）。
+ *
+ * 快照表按 (run_id,decision_id) 只插不改、**原来从不淘汰**，而每条约 300KB 且随世界
+ * 复杂度膨胀（实测一局 360 日 ≈ 2.7GB；生产库 413 个 run、7.13GB、磁盘 98%）。
+ * 这是全仓唯一「再跑几个长局就吃满磁盘」的机制。
+ *
+ * 取舍：**玩家亲手下的战略永久保留**（战略库是玩家可分享的成果，不是缓存），
+ * AI 大臣与本地守军的例行代决只留最近这些条——回看近况足够，老朋友（更早的例行令）
+ * 本来就不该占着几百 KB 一条的位置。
+ */
+const SNAPSHOT_KEEP_PER_RUN=200;
+/** 库体积超过这个数才在启动时扫一次淘汰；平时由每次写入时的按需淘汰兜底。 */
+const SNAPSHOT_SWEEP_MIN_BYTES=1<<30;
 
 /** 状态工具入口：无模型调用。所有提交由 SQLite 事务串行化，与绘图任务隔离。 */
 export class WorldAgent implements WorldStateService {
@@ -296,6 +313,44 @@ export class WorldAgent implements WorldStateService {
       const data=this.strategyData(snapshot,d.id,events.filter(e=>e.revision<=end.revision).slice(-100));
       this.store.db.prepare('INSERT INTO world_strategy_snapshots VALUES(?,?,?,?)').run(w.worldId,d.id,end.revision,JSON.stringify(data));
     }
+    this.pruneSnapshots(w);
+  }
+  /**
+   * 淘汰一局里**过期**的战略快照：按 revision 只留最近 SNAPSHOT_KEEP_PER_RUN 条，
+   * 玩家亲手下的战略（issuerId 不是 ai-marshal/local-defender）永久保留。
+   *
+   * 已被 pruneDecisions 淘汰出决策簿的旧令在快照里取得到 id 却取不到 issuerId——按
+   * 「非玩家」处理（它们本就是 AI 例行代决，玩家自己下的令不会被淘汰出簿）。
+   */
+  private pruneSnapshots(w:WorldSnapshot){
+    const rows=this.store.db.prepare('SELECT decision_id AS id,revision FROM world_strategy_snapshots WHERE run_id=? ORDER BY revision DESC').all(w.worldId) as {id:string;revision:number}[];
+    if(rows.length<=SNAPSHOT_KEEP_PER_RUN)return;
+    const del=this.store.db.prepare('DELETE FROM world_strategy_snapshots WHERE run_id=? AND decision_id=?');
+    let dropped=0;
+    for(const row of rows.slice(SNAPSHOT_KEEP_PER_RUN)){
+      const d=w.decisions[row.id];
+      if(d&&d.issuerId!=='ai-marshal'&&d.issuerId!=='local-defender')continue; // 玩家的战略：不动
+      del.run(w.worldId,row.id);dropped++;
+    }
+    if(dropped>0)console.log(`[snapshots] 本局淘汰过期战略快照 ${dropped} 条（保留最近 ${SNAPSHOT_KEEP_PER_RUN} 条 + 玩家战略）`);
+  }
+  /**
+   * 启动时兜底：库体积超过阈值才扫一遍淘汰。既有的大库（实测 7.13GB）不会因为「从今天起
+   * 才淘汰」而继续膨胀——重启一次就把历史欠账清掉。小库不打这笔扫描，别为省几 MB 拖慢启动。
+   */
+  sweepSnapshots(){
+    let size=0;try{size=statSync(resolve(this.store.directory,'agents.sqlite')).size;}catch{return 0;}
+    if(size<SNAPSHOT_SWEEP_MIN_BYTES)return 0;
+    const runs=this.store.db.prepare('SELECT DISTINCT run_id FROM world_strategy_snapshots').all() as {run_id:string}[];
+    let before=0,after=0;
+    const count=()=>Number((this.store.db.prepare('SELECT COUNT(*) AS n FROM world_strategy_snapshots').get() as {n:number}).n);
+    before=count();
+    for(const r of runs){const w=this.getWorld(r.run_id);if(w)this.pruneSnapshots(w);}
+    after=count();
+    // WAL 常驻不回收也会把磁盘吃掉（实测 +192MB）：淘汰完做一次 checkpoint。
+    try{this.store.db.exec('PRAGMA wal_checkpoint(TRUNCATE)');}catch{/* 只读库或并发占用时不强求 */}
+    console.log(`[snapshots] 启动淘汰：${before} → ${after} 条（库 ${Math.round(size/1048576)}MB）`);
+    return before-after;
   }
   private strategyData(w:WorldSnapshot,decisionId?:string,events=this.recentEvents(w.worldId)):StrategyData {
     const data=projectStrategy(w,events,{title:this.store.run(w.worldId).spec.title,runId:w.worldId,basisNote:this.basis(w.worldId)?.note,demo:this.basis(w.worldId)?.kind==='demo'});

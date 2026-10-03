@@ -238,7 +238,7 @@ export default function PlayScreen() {
     if (!res.ok) throw new Error((await res.json() as { error?: string }).error || t(locale, 'error.http', { status: res.status }));
   }
   async function refreshAchv() { try { const r = await api<AchievementsView & { newlyUnlocked: { name: string }[] }>(`runs/${runId.current}/achievements`); setAchv(r); showToast(r.newlyUnlocked.map(a => t(locale, 'save.unlocked', { name: a.name }))); } catch { /* 无成就可算时不打扰 */ } }
-  async function saveToSlot(slot: number) { if (!view) return; setBusy(true); setSaveNote(''); try { const r = await api<{ slot: SaveSlotView }>('saves', { slot, runId: view.id, court: courtId.name }); setSlots(p => p.map(s => s.slot === slot ? r.slot : s)); setSaveNote(t(locale, 'save.saved', { slot, title: r.slot.title, day: Math.floor(r.slot.elapsedDays) + 1 })); } catch (e) { setSaveNote((e as Error).message); } finally { setBusy(false); } }
+  async function saveToSlot(slot: number) { if (!view) return; setBusy(true); setSaveNote(''); try { const r = await api<{ slot: SaveSlotView }>('saves', { slot, runId: view.id, court: courtId.court }); setSlots(p => p.map(s => s.slot === slot ? r.slot : s)); setSaveNote(t(locale, 'save.saved', { slot, title: r.slot.title, day: Math.floor(r.slot.elapsedDays) + 1 })); } catch (e) { setSaveNote((e as Error).message); } finally { setBusy(false); } }
   async function loadFromSlot(slot: number) {
     if (!view) return; setBusy(true);
     try {

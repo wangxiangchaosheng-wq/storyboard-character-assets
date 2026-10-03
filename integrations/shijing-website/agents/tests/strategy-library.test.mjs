@@ -17,6 +17,28 @@ test('completed child strategy is frozen while parent topic continues; retry can
 test('cancelled strategy stays below its own topic with correct frozen status',t=>{const {agent,id}=setup(t);order(agent,id,'out','march',{targetCityId:'changan'});agent.localAdvance(id,{commandId:'hour',expectedRevision:agent.getWorld(id).revision,hours:1});order(agent,id,'return','retreat',{targetCityId:'hanzhong'});const entries=agent.strategyLibrary().maps[0].strategies;const cancelled=entries.find(d=>d.status==='cancelled');assert.ok(cancelled);const past=agent.strategyMap(id,cancelled.id);assert.equal(past.data.focusDecisionId,cancelled.id);assert.equal(past.data.decisions.find(d=>d.id===cancelled.id).status,'已撤销');assert.equal(agent.strategyMap(id,entries.find(d=>d.status==='executing').id).historical,false);});
 test('archive write failure rolls back world, event and inventory together',t=>{const {store,agent,id}=setup(t);store.db.exec("CREATE TRIGGER fail_archive BEFORE INSERT ON world_strategy_snapshots BEGIN SELECT RAISE(ABORT,'test archive failure'); END;");agent.localAdvance(id,{commandId:'warmup',expectedRevision:agent.getWorld(id).revision,hours:8});// 同上：满携粮状态下装不下这 1000 公斤，先耗一点才走得到存档写入
  const before=agent.getWorld(id);const eventsBefore=agent.listEvents(id).length;assert.throws(()=>order(agent,id,'load','resupply',{sourceCityId:'hanzhong',foodKg:1000}),/archive failure/);assert.deepEqual(agent.getWorld(id),before);assert.equal(agent.listEvents(id).length,eventsBefore,'失败的军令不许留下事件');});
+// G（工程审计实测：生产库 7.13GB、磁盘 98%）——战略快照表原来**只插不改、从不淘汰**，
+// 每条约 300KB 且随世界复杂度膨胀，一局 360 日能到 2.7GB，是全仓唯一「再跑几个长局就
+// 吃满磁盘」的机制。这里锁两条：① AI/例行代决的快照只留最近 200 条；② 玩家亲手下的
+// 战略**永久保留**——战略库是玩家可分享的成果，不是缓存。
+test('expired strategy snapshots are pruned; player-owned strategies are kept forever',t=>{
+ const {agent,store,id}=setup(t);
+ // 下一道玩家自己的军令：行军令会建一条 issuerId==='player' 的决策
+ agent.localOrder(id,{commandId:'player-order',expectedRevision:agent.getWorld(id).revision,armyId:'army-wei-yan',kind:'march',targetCityId:'changan'});
+ const playerIds=Object.values(agent.getWorld(id).decisions).filter(d=>d.issuerId==='player').map(d=>d.id);
+ assert.ok(playerIds.length>0,'行军令应产生玩家自己的决策');
+ const playerSnapId=playerIds[0];
+ store.db.prepare('INSERT INTO world_strategy_snapshots VALUES(?,?,?,?)').run(id,playerSnapId,1,JSON.stringify({mine:true}));
+ // 再造 210 条 AI 例行快照（revision 越大越新，淘汰按 revision 从旧的开始）
+ for(let i=0;i<210;i++)store.db.prepare('INSERT OR REPLACE INTO world_strategy_snapshots VALUES(?,?,?,?)').run(id,'ai-'+i,i+2,JSON.stringify({ai:i}));
+ const before=store.db.prepare('SELECT COUNT(*) AS n FROM world_strategy_snapshots WHERE run_id=?').get(id).n;
+ assert.equal(before,211);
+ // 触发一次归档（任意写入都会走 archiveStrategies → pruneSnapshots）
+ agent.localAdvance(id,{commandId:'prune-trigger',expectedRevision:agent.getWorld(id).revision,hours:1});
+ const rows=store.db.prepare('SELECT decision_id AS id FROM world_strategy_snapshots WHERE run_id=?').all(id).map(r=>r.id);
+ assert.ok(rows.includes(playerSnapId),'玩家亲手下的战略必须保留');
+ assert.ok(rows.length<before,'淘汰必须真的发生了（原 '+before+' → 现 '+rows.length+'）');
+});
 test('library pagination does not inherit the old 30-run cap and excludes demo units',t=>{const {store,agent}=setup(t);for(let i=0;i<31;i++)store.create({...spec,title:'北伐 '+i});agent.createDemo('excluded');let cursor='',ids=[];do{const page=agent.strategyLibrary(cursor,7);ids.push(...page.maps.map(m=>m.id));if(page.nextCursor===null)break;cursor=page.nextCursor;}while(true);assert.equal(ids.length,32);assert.equal(new Set(ids).size,32);assert.throws(()=>agent.strategyLibrary(-1),/分页/);});
 test('startup reconstructs legacy ended snapshots before later ownership changes, including null fields',t=>{const {store,agent}=setup(t);const run=store.create({...spec,id:'external-test',title:'测试外部世界',scenario:{background:'公元228年'}});const w=demoWorld(run.id);w.scenarioId=run.spec.id;agent.initializeWorld(run.id,{initializationId:'external',snapshot:w,basis:{kind:'research',note:'测试记录'}});for(const e of demoSettlements())agent.applySettlement(run.id,{...e,source:'rules'});const past=agent.strategyMap(run.id,'decision-ziwu');agent.applySettlement(run.id,{settlementId:'later',expectedRevision:agent.getWorld(run.id).revision,decisionId:null,source:'rules',elapsedDays:1,title:'后续占领',summary:'后续独立事件',mutations:[{kind:'army.move',armyId:'army-changan',location:{kind:'field',point:w.cities.changan.point,label:'撤离'},status:'resting',reason:'撤离'},{kind:'city.capture',cityId:'changan',ownerFactionId:'shu',governor:{id:'new-governor',name:'新守将'},reason:'新事件'}]});store.db.prepare('DELETE FROM world_strategy_snapshots WHERE run_id=?').run(run.id);agent.bootstrapPendingRuns();assert.deepEqual(agent.strategyMap(run.id,'decision-ziwu'),past);assert.equal(agent.getWorld(run.id).cities.changan.ownerFactionId,'shu');});
 test('HTTP library and topic map are read-only and never generate art',async t=>{const {store,agent,id}=setup(t);const server=makeServer(store,{active:false,drain(){assert.fail('read must not generate');}});await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>{server.close(r);server.closeAllConnections();}));const base='http://127.0.0.1:'+server.address().port;const index=await(await fetch(base+'/strategy-library')).json();assert.equal(index.maps[0].id,id);const map=await(await fetch(base+'/runs/'+id+'/strategy-map')).json();assert.equal(map.topicId,id);assert.equal(agent.getWorld(id).revision,1,'只读不得改写世界（开局清算那一次除外）');assert.equal((await fetch(base+'/runs/'+id+'/strategy-map?decisionId=missing')).status,404);});
